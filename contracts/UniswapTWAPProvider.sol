@@ -33,14 +33,6 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
     uint acc;
   }
 
-  /// @notice The highest ratio of the new price to the anchor price that will still trigger the price to be updated
-  // TODO: get rid of it
-  uint public immutable upperBoundAnchorRatio;
-
-  /// @notice The lowest ratio of the new price to the anchor price that will still trigger the price to be updated
-  // TODO: get rid of it
-  uint public immutable lowerBoundAnchorRatio;
-
   /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced
   uint public immutable anchorPeriod;
 
@@ -51,15 +43,9 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
   mapping(bytes32 => Observation) public newObservations;
 
   constructor(
-    uint anchorToleranceMantissa_,
     uint anchorPeriod_,
     TokenConfig[] memory configs
   ) public {
-    // Allow the tolerance to be whatever the deployer chooses, but prevent under/overflow (and prices from being 0)
-    // TODO: get rid of it
-    upperBoundAnchorRatio = anchorToleranceMantissa_ > uint(-1) - 100e16 ? uint(-1) : 100e16 + anchorToleranceMantissa_;
-    lowerBoundAnchorRatio = anchorToleranceMantissa_ < 100e16 ? 100e16 - anchorToleranceMantissa_ : 1;
-
     anchorPeriod = anchorPeriod_;
 
     for (uint i = 0; i < configs.length; i++) {

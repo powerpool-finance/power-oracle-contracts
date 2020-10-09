@@ -75,6 +75,7 @@
     "typechain": "buidler typechain"
   },
   "dependencies": {
-    "@nomiclabs/buidler-ethers": "^2.0.0"
+    "@nomiclabs/buidler-ethers": "^2.0.0",
+    "bignumber.js": "^9.0.1"
   }
 }

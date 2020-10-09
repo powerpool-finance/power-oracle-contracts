@@ -15,10 +15,6 @@ import "./interfaces/IPowerOracleStaking.sol";
 contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   using SafeMath for uint256;
 
-  struct User {
-    address rewards;
-  }
-
   struct Price {
     uint128 timestamp;
     uint128 value;
@@ -27,6 +23,14 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   event SetReportReward(uint256 reportReward);
   event SetReportIntervals(uint256 minReportInterval, uint256 maxReportInterval);
 
+  /// @notice The event emitted when a reporter receives their reward for the report
+  event AccrueReward(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint calculatedReward);
+
+  /// @notice The event emitted when a reporter is not eligible for a reward or rewards are disabled
+  event AccrueRewardIgnored(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint256 calculatedReward, uint maxCvpReward);
+
+  event NoRewardToAccrue(uint256 indexed userId, uint ethPrice);
+
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint price);
 
@@ -34,6 +38,11 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   address public immutable reservoir;
   IPowerOracleStaking public powerOracleStaking;
 
+
+  /// @notice The limit in CVP for a reward for reportin a single token
+  uint256 public maxCvpReward;
+
+  /// @notice The reward in ETH for reporting a single token
   uint256 public reportReward;
   uint256 public minReportInterval;
   uint256 public maxReportInterval;
@@ -46,10 +55,9 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   constructor(
     address cvpToken_,
     address reservoir_,
-    uint256 anchorToleranceMantissa_,
     uint256 anchorPeriod_,
     TokenConfig[] memory configs
-  ) public UniswapTWAPProvider(anchorToleranceMantissa_, anchorPeriod_, configs) UniswapConfig(configs) {
+  ) public UniswapTWAPProvider(anchorPeriod_, configs) UniswapConfig(configs) {
     cvpToken = IERC20(cvpToken_);
     reservoir = reservoir_;
   }
@@ -58,24 +66,26 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   function initialize(
     address powerOracleStaking_,
     uint256 reportReward_,
+    uint256 maxCvpReward_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
   ) external {
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     reportReward = reportReward_;
+    maxCvpReward = maxCvpReward_;
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
   }
 
   /*** Current Reporter Or Slasher Interface ***/
   /// Poke to update the given symbol prices
-  function poke(uint256 reporterId_, string[] memory symbols_) public {
-    IPowerOracleStaking.UserStatus status = powerOracleStaking.getUserStatus(reporterId_, msg.sender);
+  function poke(uint256 userId_, string[] memory symbols_) public {
+    IPowerOracleStaking.UserStatus status = powerOracleStaking.getUserStatus(userId_, msg.sender);
 
     if (status == IPowerOracleStaking.UserStatus.CAN_REPORT) {
-      _pokeFromReporter(symbols_);
+      _pokeFromReporter(userId_, symbols_);
     } else if (status == IPowerOracleStaking.UserStatus.CAN_SLASH) {
-      _pokeFromSlasher(symbols_);
+      _pokeFromSlasher(userId_, symbols_);
     } else {
       _pokeWithoutReward(symbols_);
     }
@@ -87,7 +97,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     return ethPrice;
   }
 
-  function _pokeFromReporter(string[] memory symbols_) internal {
+  function _pokeFromReporter(uint256 userId_, string[] memory symbols_) internal {
     uint256 ethPrice = _updateEthPrice();
     uint256 rewardCount = 0;
     uint256 len = symbols_.length;
@@ -99,11 +109,14 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
       }
     }
 
-//    emit PostPrices(msg.sender, len, rewardCount);
-//    payoutReward(rewardCount, ethPrice);
+    emit PokeFromReporter(userId_, len, rewardCount);
+    accrueReward(userId_, rewardCount, ethPrice);
   }
+  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
+  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 rewardCount);
+  event PokeFromUnknown(address indexed poker, uint256 tokenCount);
 
-  function _pokeFromSlasher(string[] memory symbols_) internal {
+  function _pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) internal {
     uint256 ethPrice = _updateEthPrice();
     uint256 rewardCount = 0;
     uint256 len = symbols_.length;
@@ -114,6 +127,9 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
         rewardCount++;
       }
     }
+
+    emit PokeFromSlasher(slasherId_, len, rewardCount);
+    accrueReward(slasherId_, rewardCount, ethPrice);
   }
 
   function _pokeWithoutReward(string[] memory symbols_) internal {
@@ -124,6 +140,8 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     for (uint256 i = 0; i < len; i++) {
       _fetchAndSavePrice(symbols_[i], ethPrice);
     }
+
+    emit PokeFromUnknown(msg.sender, len);
   }
 
   enum ReportInterval {
@@ -161,6 +179,38 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     }
 
     return ReportInterval.GREATER_THAN_MAX;
+  }
+
+  function accrueReward(uint256 userId_, uint256 count_, uint ethPrice_) internal {
+    if (count_ == 0) {
+      emit NoRewardToAccrue(userId_, ethPrice_);
+      return;
+    }
+
+    uint cvpPrice = fetchCvpPrice();
+    uint amount = calculateReward(count_, ethPrice_, cvpPrice);
+
+    if (amount > 0) {
+      rewards[userId_] = rewards[userId_].add(amount);
+      emit AccrueReward(userId_, count_, ethPrice_, cvpPrice, amount);
+    } else {
+      emit AccrueRewardIgnored(userId_, count_, ethPrice_, cvpPrice, amount, maxCvpReward);
+    }
+  }
+
+  function calculateReward(uint count_, uint ethPrice_, uint cvpPrice_) public view returns(uint) {
+    if (count_ == 0) {
+      return 0;
+    }
+
+    require(ethPrice_ > 0, "calculateReward: ETH price is 0");
+    require(cvpPrice_ > 0, "calculateReward: CVP price is 0");
+    require(reportReward > 0, "calculateReward: ethReward is 0");
+
+    // return count * cvpReward * ethPrice / cvpPrice
+    uint singleTokenCvpReward = mul(reportReward, ethPrice_) / cvpPrice_;
+
+    return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
   }
 
   function priceInternal(TokenConfig memory config) internal view returns (uint) {
@@ -202,38 +252,26 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
 
   /// Get price by a token address
   function getPriceByAddress(address token) external view override returns (uint256) {
-
+    TokenConfig memory config = getTokenConfigByUnderlying(token);
+    return priceInternal(config);
   }
 
-  /// Get price by a token symbol, like "USDC"
+  /**
+   * @notice Get the official price for a symbol, like "COMP"
+   * @param symbol The symbol to fetch the price of
+   * @return Price denominated in USD, with 6 decimals
+   */
   function getPriceBySymbol(string calldata symbol) external view override returns (uint256) {
-
+    TokenConfig memory config = getTokenConfigBySymbol(symbol);
+    return priceInternal(config);
   }
 
   /// Get price by a token symbol hash, like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
   function getPriceByHash(bytes32 symbolHash) external view override returns (uint256) {
-
-  }
-
-  /// Get price by a token symbol in bytes32 representation, like "0x5553444300000000000000000000000000000000000000000000000000000000" for USDC
-  function getPriceByBytes32(bytes32 symbol) external view override returns (uint256) {
-
-  }
-
-  /// Get rewards by accounts
-  function getRewardsAvailable(address userId) external view override returns (uint256) {
-
-  }
-
-  /**
- * @notice Get the official price for a symbol
- * @param symbol The symbol to fetch the price of
- * @return Price denominated in USD, with 6 decimals
- */
-  function price(string memory symbol) external view returns (uint) {
-    TokenConfig memory config = getTokenConfigBySymbol(symbol);
+    TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash);
     return priceInternal(config);
   }
+
   /**
    * @notice Get the underlying price of a cToken
    * @dev Implements the PriceOracle interface for Compound v2.

@@ -5,13 +5,13 @@ const { solidity } = require('ethereum-waffle');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
-const PowerOracleStaking = artifacts.require('PowerOracleStaking');
+const PowerOracleTest = artifacts.require('PowerOracleStaking');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
-PowerOracleStaking.numberFormat = 'String';
+PowerOracleTest.numberFormat = 'String';
 
 describe('PowerOracleStaking', function () {
   let staking;
@@ -30,12 +30,12 @@ describe('PowerOracleStaking', function () {
 
   describe('initialization', () => {
     it('should assign constructor args correctly', async function() {
-      staking = await PowerOracleStaking.new(cvpToken.address);
+      staking = await PowerOracleTest.new(cvpToken.address);
       expect(await staking.cvpToken()).to.be.equal(cvpToken.address);
     });
 
     it('should initialize correctly', async function() {
-      staking = await PowerOracleStaking.new(cvpToken.address);
+      staking = await PowerOracleTest.new(cvpToken.address);
       await staking.initialize(powerOracle, ether(300), ether(15), ether(20));
 
       expect(await staking.powerOracle()).to.be.equal(powerOracle);

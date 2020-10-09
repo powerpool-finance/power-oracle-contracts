@@ -52,7 +52,7 @@ interface IPowerOracleStaking {
   function highestDeposit() external view returns (uint256);
 
   /// The amount of CVP staked by the given user id
-  function getDeposit(uint256 userId) external view returns (uint256);
+  function getDepositOf(uint256 userId) external view returns (uint256);
 
   /// Checks whether the userId and reporterKey belong to the current reporter
   function getUserStatus(uint256 userId_, address reporterKey_) external view returns (UserStatus);

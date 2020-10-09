@@ -12,8 +12,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
 
   uint256 public constant HUNDRED_PCT = 100 ether;
 
-  event CreateUser(uint256 indexed userId, address adminKey, address reporterKey, address financier);
-  event UpdateUser(uint256 indexed userId, address adminKey, address reporterKey, address financier);
+  event CreateUser(uint256 indexed userId, address indexed adminKey, address reporterKey, address financier);
+  event UpdateUser(uint256 indexed userId, address indexed adminKey, address reporterKey, address financier);
   event Deposit(uint256 indexed userId, address indexed financier, uint256 amount, uint256 depositAfter);
   event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
   event WithdrawExtraCVP(bool indexed sent, uint256 erc20Balance, uint256 totalBalance);
@@ -22,6 +22,13 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   event SetPowerOracle(address powerOracle);
   event SetReporter(bool indexed changed, uint256 indexed reporterId, address indexed msgSender);
   event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 slasherReward, uint256 reservoirReward);
+  event ReporterChange(
+    uint256 indexed prevId,
+    uint256 indexed nextId,
+    uint256 highestDepositPrev,
+    uint256 actualDepositPrev,
+    uint256 actualDepositNext
+  );
 
   struct User {
     address adminKey;
@@ -71,6 +78,15 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
 
     uint256 depositAfter = user.deposit.add(amount_);
     user.deposit = depositAfter;
+
+    uint256 highestDeposit = _highestDeposit;
+    uint256 prevReporterId = _reporterId;
+    if (depositAfter > highestDeposit && prevReporterId != userId_) {
+      _highestDeposit = depositAfter;
+      _reporterId = userId_;
+
+      emit ReporterChange(_reporterId, userId_, highestDeposit, users[prevReporterId].deposit, depositAfter);
+    }
 
     emit Deposit(userId_, msg.sender, amount_, depositAfter);
     cvpToken.transferFrom(msg.sender, address(this), amount_);
@@ -198,7 +214,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
     return _highestDeposit;
   }
 
-  function getDeposit(uint256 userId_) external view override returns (uint256) {
+  function getDepositOf(uint256 userId_) external view override returns (uint256) {
     return users[userId_].deposit;
   }
 

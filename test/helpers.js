@@ -1,6 +1,7 @@
 const TruffleContract = require('@nomiclabs/truffle-contract');
 const { ether: etherBN, expectEvent } = require('@openzeppelin/test-helpers');
 const { promisify } = require('util');
+const BigNumber = require('bignumber.js')
 
 const AdminUpgradeabilityProxyArtifact = require('@openzeppelin/upgrades-core/artifacts/AdminUpgradeabilityProxy.json');
 const ProxyAdminArtifact = require('@openzeppelin/upgrades-core/artifacts/ProxyAdmin.json');
@@ -19,7 +20,8 @@ let proxyAdmin;
  * Deploys a proxied contract
  *
  * @param contract Truffle Contract
- * @param {string[]} args
+ * @param {string[]} constructorArgs
+ * @param {string[]} initializerArgs
  * @param {object} opts
  * @param {string} opts.deployer
  * @param {string} opts.initializer
@@ -28,12 +30,13 @@ let proxyAdmin;
  */
 async function deployProxied(
   contract,
-  args = [],
+  constructorArgs = [],
+  initializerArgs = [],
   opts = {}
 ) {
-  const impl = await contract.new();
+  const impl = await contract.new(...constructorArgs);
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
-  const data = getInitializerData(impl, args, opts.initializer);
+  const data = getInitializerData(impl, initializerArgs, opts.initializer);
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
   const instance = await contract.at(proxy.address);
 
@@ -159,6 +162,26 @@ function K(v) {
   return ether(v * 1000);
 }
 
+function address(n) {
+  return `0x${n.toString(16).padStart(40, '0')}`;
+}
+
+function keccak256(str) {
+  return web3.utils.keccak256(str);
+}
+
+function uint256(int) {
+  return web3.eth.abi.encodeParameter('uint256', int);
+}
+
+function uint(n) {
+  return web3.utils.toBN(n).toString();
+}
+
+const fixed = num => {
+  return (new BigNumber(num).toFixed());
+};
+
 module.exports = {
   advanceBlocks,
   createOrGetProxyAdmin,
@@ -168,5 +191,10 @@ module.exports = {
   splitCalldata,
   fetchLogs,
   decodeRevertBytes,
-  K
+  K,
+  address,
+  keccak256,
+  uint256,
+  uint,
+  fixed
 }
