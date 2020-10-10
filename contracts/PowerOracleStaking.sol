@@ -20,7 +20,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   event SetMinimalSlashingDeposit(uint256 amount);
   event SetSlashingPct(uint256 slasherRewardPct, uint256 reservoirSlashingRewardPct);
   event SetPowerOracle(address powerOracle);
-  event SetReporter(bool indexed changed, uint256 indexed reporterId, address indexed msgSender);
+  event SetReporter(uint256 indexed reporterId, address indexed msgSender);
   event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 slasherReward, uint256 reservoirReward);
   event ReporterChange(
     uint256 indexed prevId,
@@ -103,6 +103,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
     require(amount_ <= depositBefore, "PowerOracleStaking::withdraw: Amount exceeds deposit");
 
     uint256 depositAfter = depositBefore - amount_;
+    users[userId_].deposit = depositAfter;
 
     emit Withdraw(userId_, msg.sender, to_, amount_, depositAfter);
     cvpToken.transfer(to_, amount_);
@@ -136,7 +137,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   /*** PowerOracle Contract Interface ***/
 
   /// Slashes the current reporter if it did not make poke() call during the given report interval
-  function slash(uint256 slasherId_, uint256 newReporterId_) external override {
+  function slash(uint256 slasherId_) external override {
     User storage slasher = users[slasherId_];
     require(slasher.deposit >= minimalSlashingDeposit, "PowerOracleStaking::slash: Insufficient slasher deposit");
 
@@ -186,21 +187,14 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   /*** Permissionless Interface ***/
 
   /// Set a given address as a reporter if his deposit is higher than the current highestDeposit
-  function setReporter(uint256 reporterId_) external override {
-    _setReporter(reporterId_);
-  }
+  function setReporter(uint256 candidateId_) external override {
+    uint256 candidateDeposit = users[candidateId_].deposit;
+    uint256 currentDeposit = users[_reporterId].deposit;
+    require(candidateDeposit > currentDeposit, "PowerOracleStaking::setReporter: Insufficient candidate deposit");
+    _highestDeposit = candidateDeposit;
+    _reporterId = candidateId_;
 
-  function _setReporter(uint256 reporterId_) internal {
-    uint256 reporterDeposit = users[reporterId_].deposit;
-    bool changed = false;
-
-    if (reporterDeposit > _highestDeposit) {
-      _highestDeposit = reporterDeposit;
-      _reporterId = reporterId_;
-      changed = true;
-    }
-
-    emit SetReporter(changed, reporterId_, msg.sender);
+    emit SetReporter(candidateId_, msg.sender);
   }
 
   /*** Viewers ***/
@@ -222,10 +216,20 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
     if (userId_ == _reporterId && users[userId_].reporterKey == reporterKey_) {
       return UserStatus.CAN_REPORT;
     }
-    if (users[userId_].deposit > minimalSlashingDeposit) {
+    if (users[userId_].deposit > minimalSlashingDeposit && users[userId_].reporterKey == reporterKey_) {
       return UserStatus.CAN_SLASH;
     }
     return UserStatus.UNAUTHORIZED;
+  }
+
+  function authorizeReporter(uint256 userId_, address pokerKey_) external view override {
+    require(userId_ == _reporterId, "PowerOracleStaking::authorizeReporter: Invalid reporter");
+    require(users[userId_].reporterKey == pokerKey_, "PowerOracleStaking::authorizeReporter: Invalid poker key");
+  }
+
+  function authorizeSlasher(uint256 userId_, address pokerKey_) external view override {
+    require(users[userId_].deposit >= minimalSlashingDeposit, "PowerOracleStaking::authorizeSlasher: Insufficient deposit");
+    require(users[userId_].reporterKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid pokerKey");
   }
 
   function isValidReporterKey(uint256 userId_, address reporter_) external view override returns (bool) {

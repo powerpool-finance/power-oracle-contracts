@@ -33,6 +33,9 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
 
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint price);
+  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
+  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 rewardCount);
+  event PokeFromUnknown(address indexed poker, uint256 tokenCount);
 
   IERC20 public immutable cvpToken;
   address public immutable reservoir;
@@ -77,19 +80,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     maxReportInterval = maxReportInterval_;
   }
 
-  /*** Current Reporter Or Slasher Interface ***/
-  /// Poke to update the given symbol prices
-  function poke(uint256 userId_, string[] memory symbols_) public {
-    IPowerOracleStaking.UserStatus status = powerOracleStaking.getUserStatus(userId_, msg.sender);
-
-    if (status == IPowerOracleStaking.UserStatus.CAN_REPORT) {
-      _pokeFromReporter(userId_, symbols_);
-    } else if (status == IPowerOracleStaking.UserStatus.CAN_SLASH) {
-      _pokeFromSlasher(userId_, symbols_);
-    } else {
-      _pokeWithoutReward(symbols_);
-    }
-  }
+  /*** Current Poke Interface ***/
 
   function _updateEthPrice() internal returns (uint256) {
     uint256 ethPrice = fetchEthPrice();
@@ -97,7 +88,9 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     return ethPrice;
   }
 
-  function _pokeFromReporter(uint256 userId_, string[] memory symbols_) internal {
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external {
+    powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
+
     uint256 ethPrice = _updateEthPrice();
     uint256 rewardCount = 0;
     uint256 len = symbols_.length;
@@ -109,14 +102,13 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
       }
     }
 
-    emit PokeFromReporter(userId_, len, rewardCount);
-    accrueReward(userId_, rewardCount, ethPrice);
+    emit PokeFromReporter(reporterId_, len, rewardCount);
+    accrueReward(reporterId_, rewardCount, ethPrice);
   }
-  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
-  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 rewardCount);
-  event PokeFromUnknown(address indexed poker, uint256 tokenCount);
 
-  function _pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) internal {
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external {
+    powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
+
     uint256 ethPrice = _updateEthPrice();
     uint256 rewardCount = 0;
     uint256 len = symbols_.length;
@@ -129,10 +121,11 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     }
 
     emit PokeFromSlasher(slasherId_, len, rewardCount);
+    powerOracleStaking.slash(slasherId_);
     accrueReward(slasherId_, rewardCount, ethPrice);
   }
 
-  function _pokeWithoutReward(string[] memory symbols_) internal {
+  function poke(string[] memory symbols_) internal {
     uint256 ethPrice = _updateEthPrice();
     uint256 len = symbols_.length;
 
@@ -142,12 +135,6 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     }
 
     emit PokeFromUnknown(msg.sender, len);
-  }
-
-  enum ReportInterval {
-    LESS_THAN_MIN,
-    OK,
-    GREATER_THAN_MAX
   }
 
   function _fetchAndSavePrice(string memory symbol_, uint ethPrice_) internal returns (ReportInterval) {
@@ -163,9 +150,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
     Price memory oldPrice = prices[symbolHash];
 
-    uint256 now = block.timestamp;
-
-    uint256 delta = now - oldPrice.timestamp;
+    uint256 delta = block.timestamp - oldPrice.timestamp;
     if (delta < minReportInterval) {
       return ReportInterval.LESS_THAN_MIN;
     }
@@ -213,13 +198,13 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
   }
 
-  function priceInternal(TokenConfig memory config) internal view returns (uint) {
-    if (config.priceSource == PriceSource.REPORTER) return prices[config.symbolHash].value;
-    if (config.priceSource == PriceSource.FIXED_USD) return config.fixedPrice;
-    if (config.priceSource == PriceSource.FIXED_ETH) {
+  function priceInternal(TokenConfig memory config_) internal view returns (uint) {
+    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
+    if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
+    if (config_.priceSource == PriceSource.FIXED_ETH) {
       uint usdPerEth = prices[ethHash].value;
       require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
-      return mul(usdPerEth, config.fixedPrice) / ethBaseUnit;
+      return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
     }
     revert("UniswapTWAPProvider::priceInternal: Unsupported case");
   }
@@ -230,6 +215,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     require(to_ != address(0), "PowerOracle::withdrawRewards: Can't withdraw to 0 address");
     uint256 rewardAmount = rewards[userId_];
     require(rewardAmount > 0, "PowerOracle::withdrawRewards: Nothing to withdraw");
+    rewards[userId_] = 0;
 
     cvpToken.transferFrom(reservoir, to_, rewardAmount);
   }
@@ -251,35 +237,35 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   /*** Viewers ***/
 
   /// Get price by a token address
-  function getPriceByAddress(address token) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token);
+  function getPriceByAddress(address token_) external view override returns (uint256) {
+    TokenConfig memory config = getTokenConfigByUnderlying(token_);
     return priceInternal(config);
   }
 
   /**
    * @notice Get the official price for a symbol, like "COMP"
-   * @param symbol The symbol to fetch the price of
+   * @param symbol_ The symbol to fetch the price of
    * @return Price denominated in USD, with 6 decimals
    */
-  function getPriceBySymbol(string calldata symbol) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigBySymbol(symbol);
+  function getPriceBySymbol(string calldata symbol_) external view override returns (uint256) {
+    TokenConfig memory config = getTokenConfigBySymbol(symbol_);
     return priceInternal(config);
   }
 
   /// Get price by a token symbol hash, like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
-  function getPriceByHash(bytes32 symbolHash) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash);
+  function getPriceByHash(bytes32 symbolHash_) external view override returns (uint256) {
+    TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash_);
     return priceInternal(config);
   }
 
   /**
    * @notice Get the underlying price of a cToken
    * @dev Implements the PriceOracle interface for Compound v2.
-   * @param cToken The cToken address for price retrieval
+   * @param cToken_ The cToken address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given cToken address
    */
-  function getUnderlyingPrice(address cToken) external view returns (uint) {
-    TokenConfig memory config = getTokenConfigByCToken(cToken);
+  function getUnderlyingPrice(address cToken_) external view returns (uint) {
+    TokenConfig memory config = getTokenConfigByCToken(cToken_);
     // Comptroller needs prices in the format: ${raw price} * 1e(36 - baseUnit)
     // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
     return mul(1e30, priceInternal(config)) / config.baseUnit;

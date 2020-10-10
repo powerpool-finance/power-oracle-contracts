@@ -68,8 +68,9 @@
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
     "prettier:sol": "prettier --config .prettierrc --write \"contracts/**/*.sol\"",
     "prettier:list-different": "prettier --config .prettierrc --list-different \"**/*.{js,json,md,sol,ts}\"",
-    "test": "mocha",
+    "test": "mocha --timeout 20000",
     "test:local": "buidler test --network local",
+    "pairs": "builder pair-details --network mainnet",
     "report:size": "buidler size-contracts",
     "report:gas": "./scripts/gasUsedReport.sh",
     "typechain": "buidler typechain"

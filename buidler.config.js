@@ -5,6 +5,8 @@ usePlugin('solidity-coverage');
 usePlugin('buidler-contract-sizer');
 usePlugin('buidler-gas-reporter');
 
+require('./tasks/fetchPairValues')
+
 
 const config = {
   analytics: {
@@ -19,10 +21,15 @@ const config = {
     currency: 'USD',
     enabled: !!(process.env.REPORT_GAS)
   },
-  mocha: {},
+  mocha: {
+    timeout: 20000
+  },
   networks: {
     buidlerevm: {
       chainId: 31337,
+    },
+    mainnet: {
+      url: 'https://mainnet-eth.compound.finance',
     },
     local: {
       url: 'http://127.0.0.1:8545',

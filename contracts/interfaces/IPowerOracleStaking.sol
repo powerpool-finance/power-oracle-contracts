@@ -36,7 +36,7 @@ interface IPowerOracleStaking {
 
   /*** PowerOracle Contract Interface ***/
   /// Slashes the current reporter if it did not make poke() call during the given report interval
-  function slash(uint256 slasherId_, uint256 newReporterId_) external;
+  function slash(uint256 slasherId_) external;
 
 
   /*** Permissionless Interface ***/
@@ -56,6 +56,10 @@ interface IPowerOracleStaking {
 
   /// Checks whether the userId and reporterKey belong to the current reporter
   function getUserStatus(uint256 userId_, address reporterKey_) external view returns (UserStatus);
+
+  function authorizeReporter(uint256 userId_, address reporterKey_) external view;
+
+  function authorizeSlasher(uint256 userId_, address reporterKey_) external view;
 
   /// Check whether the reporter key belongs to the userId
   function isValidReporterKey(uint256 userId_, address reporter_) external view returns (bool);

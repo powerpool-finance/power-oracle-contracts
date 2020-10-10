@@ -6,6 +6,7 @@ pragma experimental ABIEncoderV2;
 import "./Uniswap/UniswapConfig.sol";
 import "./utils/SafeMath.sol";
 import "./Uniswap/UniswapLib.sol";
+import "@nomiclabs/buidler/console.sol";
 
 
 abstract contract UniswapTWAPProvider is UniswapConfig {
@@ -109,6 +110,11 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
     uint unscaledPriceMantissa = mul(rawUniswapPriceMantissa, conversionFactor);
     uint anchorPrice;
 
+//    console.log("symbol", symbol);
+//    console.log("elapsed", timeElapsed);
+//    console.log("nowCumulativePrice", nowCumulativePrice);
+//    console.log("oldCumulativePrice", oldCumulativePrice);
+//    console.log("==========");
     // Adjust rawUniswapPrice according to the units of the non-ETH asset
     // In the case of ETH, we would have to scale by 1e6 / USDC_UNITS, but since baseUnit2 is 1e6 (USDC), it cancels
     if (config.isUniswapReversed) {

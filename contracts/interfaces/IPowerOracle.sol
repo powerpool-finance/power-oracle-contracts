@@ -4,6 +4,12 @@ pragma solidity ^0.6.10;
 pragma experimental ABIEncoderV2;
 
 interface IPowerOracle {
+  enum ReportInterval {
+    LESS_THAN_MIN,
+    OK,
+    GREATER_THAN_MAX
+  }
+
   /*** Current Reporter Or Slasher Interface ***/
   /// Poke to update the given symbol prices
   //  function poke(uint256 userId, string[] calldata symbolHashes) external;
