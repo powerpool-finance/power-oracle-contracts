@@ -35,7 +35,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   event PriceUpdated(string symbol, uint price);
   event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
   event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 overdueCount);
-  event PokeFromUnknown(address indexed poker, uint256 tokenCount);
+  event Poke(address indexed poker, uint256 tokenCount);
 
   IERC20 public immutable cvpToken;
   address public immutable reservoir;
@@ -136,7 +136,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     }
   }
 
-  function poke(string[] memory symbols_) internal {
+  function poke(string[] memory symbols_) public {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::poke: Missing token symbols");
 
@@ -147,7 +147,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
       _fetchAndSavePrice(symbols_[i], ethPrice);
     }
 
-    emit PokeFromUnknown(msg.sender, len);
+    emit Poke(msg.sender, len);
   }
 
   function _fetchAndSavePrice(string memory symbol_, uint ethPrice_) internal returns (ReportInterval) {

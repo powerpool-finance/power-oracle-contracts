@@ -372,9 +372,55 @@ describe('PowerOracle', function () {
       await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasher }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
+  });
+
+  describe('poke (permissionless)', () => {
+    beforeEach(async () => {
+      oracle = await deployProxied(
+        PowerOracle,
+        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        { proxyAdminOwner: owner }
+      );
+    });
+
+    it('should allow anyone calling the poke method', async function() {
+      let res = await oracle.poke(['REP', 'DAI', 'BTC'], { from: alice });
+      const firstTimestamp = await getResTimestamp(res);
+      expectEvent(res, 'Poke', {
+        poker: alice,
+        tokenCount: '3',
+      });
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'REP', 'DAI', 'BTC'],
+        oldTimestamp: '0',
+        newTimestamp: firstTimestamp
+      })
+
+      await time.increase(5);
+
+      res = await oracle.poke(['REP', 'DAI', 'BTC'], { from: alice });
+      const secondTimestamp = await getResTimestamp(res);
+      expectEvent(res, 'Poke', {
+        poker: alice,
+        tokenCount: '3',
+      });
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'REP', 'DAI', 'BTC'],
+        oldTimestamp: '0',
+        newTimestamp: secondTimestamp
+      })
+    });
+
+    it('should deny poking with an empty array', async function() {
+      await expect(oracle.poke([], { from: bob }))
+        .to.be.revertedWith('PowerOracle::poke: Missing token symbols');
+    });
 
     it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasher }))
+      await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
   });
