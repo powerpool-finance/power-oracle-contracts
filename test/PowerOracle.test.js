@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
+const { K, ether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -13,6 +13,7 @@ chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
+MockStaking.numberFormat = 'String';
 PowerOracle.numberFormat = 'String';
 
 const DAI_SYMBOL_HASH = keccak256('DAI');
@@ -25,6 +26,7 @@ const ANCHOR_PERIOD_INT = 45;
 const MIN_REPORT_INTERVAL = '30';
 const MIN_REPORT_INTERVAL_INT = 30;
 const MAX_REPORT_INTERVAL = '90';
+const MAX_REPORT_INTERVAL_INT = 90;
 const MIN_SLASHING_DEPOSIT = ether(40);
 const SLASHER_REWARD_PCT = ether(15);
 const RESERVOIR_REWARD_PCT = ether(5);
@@ -45,10 +47,10 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter;
+  let owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher;
 
   before(async function() {
-    [owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter] = await web3.eth.getAccounts();
+    [owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -257,6 +259,123 @@ describe('PowerOracle', function () {
           calculatedReward: '7227'
         });
       });
+    });
+  });
+
+  describe('pokeFromSlasher', () => {
+    beforeEach(async () => {
+      oracle = await deployProxied(
+        PowerOracle,
+        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        { proxyAdminOwner: owner }
+      );
+      await staking.setUser(1, validReporter, ether(300));
+      await staking.setReporter(1, ether(300));
+      await staking.setUser(2, validSlasher, ether(100));
+    });
+
+    it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      const firstTimestamp = await getResTimestamp(res);
+      await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expectEvent(res, 'PokeFromSlasher', {
+        slasherId: '2',
+        tokenCount: '4',
+        overdueCount: '4'
+      });
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
+        oldTimestamp: firstTimestamp,
+        newTimestamp: secondTimestamp
+      })
+
+      const logs = await fetchLogs(MockStaking, res);
+      expectEvent({ logs }, 'MockSlash', {
+        userId: '2',
+        overdueCount: '4'
+      });
+    });
+
+    it('should allow a valid slasher calling a method when prices are partially outdated', async function() {
+      // 1st poke
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+      const firstTimestamp = await getResTimestamp(res);
+
+      // 2nd poke
+      await oracle.pokeFromReporter(1, ['REP'], { from: validReporter });
+
+      // 3rd poke
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expectEvent(res, 'PokeFromSlasher', {
+        slasherId: '2',
+        tokenCount: '4',
+        overdueCount: '2'
+      });
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
+        oldTimestamp: firstTimestamp,
+        newTimestamp: secondTimestamp
+      })
+
+      const logs = await fetchLogs(MockStaking, res);
+      expectEvent({ logs }, 'MockSlash', {
+        userId: '2',
+        overdueCount: '2'
+      });
+    });
+
+    it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
+      // 1st poke
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      await time.increase(5);
+
+      // 2nd poke
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expectEvent(res, 'PokeFromSlasher', {
+        slasherId: '2',
+        tokenCount: '4',
+        overdueCount: '0'
+      });
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
+        oldTimestamp: '0',
+        newTimestamp: secondTimestamp
+      })
+
+      const logs = await fetchLogs(MockStaking, res);
+      expect(logs.length).to.be.equal(0);
+    });
+
+    it('should deny another user calling an behalf of reporter', async function() {
+      await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP'], { from: alice }))
+        .to.be.revertedWith('PowerOracleStaking::authorizeSlasher: Invalid poker key');
+    });
+
+    it('should deny calling with an empty array', async function() {
+      await expect(oracle.pokeFromSlasher(2, [], { from: validSlasher }))
+        .to.be.revertedWith('PowerOracle::pokeFromSlasher: Missing token symbols');
+    });
+
+    it('should deny poking with unknown token symbols', async function() {
+      await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasher }))
+        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+
+    it('should deny poking with unknown token symbols', async function() {
+      await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasher }))
+        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
   });
 });

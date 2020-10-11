@@ -137,7 +137,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   /*** PowerOracle Contract Interface ***/
 
   /// Slashes the current reporter if it did not make poke() call during the given report interval
-  function slash(uint256 slasherId_, uint256 overdueCount_) external override {
+  function slash(uint256 slasherId_, uint256 overdueCount_) external override virtual {
     User storage slasher = users[slasherId_];
     require(slasher.deposit >= minimalSlashingDeposit, "PowerOracleStaking::slash: Insufficient slasher deposit");
 
@@ -229,7 +229,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
 
   function authorizeSlasher(uint256 userId_, address pokerKey_) external view override {
     require(users[userId_].deposit >= minimalSlashingDeposit, "PowerOracleStaking::authorizeSlasher: Insufficient deposit");
-    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid pokerKey");
+    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid poker key");
   }
 
   function isValidReporterKey(uint256 userId_, address reporter_) external view override returns (bool) {
