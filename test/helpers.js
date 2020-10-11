@@ -135,6 +135,10 @@ async function fetchLogs(contract, receipt) {
   return contract.decodeLogs(res.logs);
 }
 
+async function getResTimestamp(res) {
+  return (await web3.eth.getBlock(res.receipt.blockNumber)).timestamp.toString();
+}
+
 /**
  * Shrinks function signature from ABI-encoded revert string.
  * @param value
@@ -190,6 +194,7 @@ module.exports = {
   getEventArg,
   splitCalldata,
   fetchLogs,
+  getResTimestamp,
   decodeRevertBytes,
   K,
   address,

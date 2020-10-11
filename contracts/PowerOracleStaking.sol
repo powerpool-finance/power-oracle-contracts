@@ -32,7 +32,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
 
   struct User {
     address adminKey;
-    address reporterKey;
+    address pokerKey;
     address financierKey;
     uint256 deposit;
   }
@@ -110,34 +110,34 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   }
 
   /// Creates a new user ID and stores the given keys
-  function createUser(address adminKey_, address reporterKey_, address financierKey_) external override {
+  function createUser(address adminKey_, address pokerKey_, address financierKey_) external override {
     uint256 userId = ++_userIdCounter;
-    users[userId] = User(adminKey_, reporterKey_, financierKey_, 0);
-    emit CreateUser(userId, adminKey_, reporterKey_, financierKey_);
+    users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
+    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_);
   }
 
   /// Updates an existing user, only the current adminKey is eligible calling this method
-  function updateUser(uint256 userId, address adminKey_, address reporterKey_, address financierKey_) external override {
+  function updateUser(uint256 userId, address adminKey_, address pokerKey_, address financierKey_) external override {
     User storage user = users[userId];
     require(msg.sender == user.adminKey, "PowerOracleStaking::updateUser: Only admin allowed");
 
     if (adminKey_ != user.adminKey) {
       user.adminKey = adminKey_;
     }
-    if (reporterKey_ != user.reporterKey) {
-      user.reporterKey = reporterKey_;
+    if (pokerKey_ != user.pokerKey) {
+      user.pokerKey = pokerKey_;
     }
     if (financierKey_ != user.financierKey) {
       user.financierKey = financierKey_;
     }
 
-    emit UpdateUser(userId, adminKey_, reporterKey_, financierKey_);
+    emit UpdateUser(userId, adminKey_, pokerKey_, financierKey_);
   }
 
   /*** PowerOracle Contract Interface ***/
 
   /// Slashes the current reporter if it did not make poke() call during the given report interval
-  function slash(uint256 slasherId_) external override {
+  function slash(uint256 slasherId_, uint256 overdueCount_) external override {
     User storage slasher = users[slasherId_];
     require(slasher.deposit >= minimalSlashingDeposit, "PowerOracleStaking::slash: Insufficient slasher deposit");
 
@@ -200,11 +200,11 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   /*** Viewers ***/
 
   /// The amount of CVP staked by the given user id
-  function reporterId() external view override returns (uint256) {
+  function getReporterId() external view override returns (uint256) {
     return _reporterId;
   }
 
-  function highestDeposit() external view override returns (uint256) {
+  function getHighestDeposit() external view override returns (uint256) {
     return _highestDeposit;
   }
 
@@ -213,10 +213,10 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   }
 
   function getUserStatus(uint256 userId_, address reporterKey_) external view override returns (UserStatus) {
-    if (userId_ == _reporterId && users[userId_].reporterKey == reporterKey_) {
+    if (userId_ == _reporterId && users[userId_].pokerKey == reporterKey_) {
       return UserStatus.CAN_REPORT;
     }
-    if (users[userId_].deposit > minimalSlashingDeposit && users[userId_].reporterKey == reporterKey_) {
+    if (users[userId_].deposit > minimalSlashingDeposit && users[userId_].pokerKey == reporterKey_) {
       return UserStatus.CAN_SLASH;
     }
     return UserStatus.UNAUTHORIZED;
@@ -224,20 +224,20 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
 
   function authorizeReporter(uint256 userId_, address pokerKey_) external view override {
     require(userId_ == _reporterId, "PowerOracleStaking::authorizeReporter: Invalid reporter");
-    require(users[userId_].reporterKey == pokerKey_, "PowerOracleStaking::authorizeReporter: Invalid poker key");
+    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeReporter: Invalid poker key");
   }
 
   function authorizeSlasher(uint256 userId_, address pokerKey_) external view override {
     require(users[userId_].deposit >= minimalSlashingDeposit, "PowerOracleStaking::authorizeSlasher: Insufficient deposit");
-    require(users[userId_].reporterKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid pokerKey");
+    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid pokerKey");
   }
 
   function isValidReporterKey(uint256 userId_, address reporter_) external view override returns (bool) {
-    return users[userId_].reporterKey == reporter_;
+    return users[userId_].pokerKey == reporter_;
   }
 
   function requireValidReporterKey(uint256 userId_, address reporter_) external view override {
-    require(users[userId_].reporterKey == reporter_, "PowerOracleStaking::requireValidReporter: Invalid reporter");
+    require(users[userId_].pokerKey == reporter_, "PowerOracleStaking::requireValidReporter: Invalid reporter");
   }
 
   function requireValidFinancierKey(uint256 userId_, address financier_) external view override {

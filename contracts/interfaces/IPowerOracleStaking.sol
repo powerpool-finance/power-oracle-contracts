@@ -36,7 +36,7 @@ interface IPowerOracleStaking {
 
   /*** PowerOracle Contract Interface ***/
   /// Slashes the current reporter if it did not make poke() call during the given report interval
-  function slash(uint256 slasherId_) external;
+  function slash(uint256 slasherId_, uint256 overdueCount_) external;
 
 
   /*** Permissionless Interface ***/
@@ -46,10 +46,10 @@ interface IPowerOracleStaking {
 
   /*** Viewers ***/
   /// The current reporter
-  function reporterId() external view returns (uint256);
+  function getReporterId() external view returns (uint256);
 
   /// The highest deposit in CVP tokens
-  function highestDeposit() external view returns (uint256);
+  function getHighestDeposit() external view returns (uint256);
 
   /// The amount of CVP staked by the given user id
   function getDepositOf(uint256 userId) external view returns (uint256);

@@ -1,47 +1,262 @@
-const { constants, time } = require('@openzeppelin/test-helpers');
-const { K, ether } = require('./helpers');
+const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
+const { K, ether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
+const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
-const PowerOracleTest = artifacts.require('PowerOracleStaking');
+const MockStaking = artifacts.require('MockStaking');
+const PowerOracle = artifacts.require('PowerOracle');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
-PowerOracleTest.numberFormat = 'String';
+PowerOracle.numberFormat = 'String';
 
-describe('PowerOracleStaking', function () {
+const DAI_SYMBOL_HASH = keccak256('DAI');
+const ETH_SYMBOL_HASH = keccak256('ETH');
+const CVP_SYMBOL_HASH = keccak256('CVP');
+const REPORT_REWARD_IN_ETH = ether('0.05');
+const MAX_CVP_REWARD = ether(15);
+const ANCHOR_PERIOD = '45';
+const ANCHOR_PERIOD_INT = 45;
+const MIN_REPORT_INTERVAL = '30';
+const MIN_REPORT_INTERVAL_INT = 30;
+const MAX_REPORT_INTERVAL = '90';
+const MIN_SLASHING_DEPOSIT = ether(40);
+const SLASHER_REWARD_PCT = ether(15);
+const RESERVOIR_REWARD_PCT = ether(5);
+
+function expectPriceUpdateEvent(config) {
+  const { response, tokenSymbols, oldTimestamp, newTimestamp } = config;
+  tokenSymbols.forEach(symbol => {
+    expectEvent(response, 'AnchorPriceUpdated', {
+      symbol: symbol,
+      oldTimestamp,
+      newTimestamp
+    });
+  })
+}
+
+describe('PowerOracle', function () {
   let staking;
+  let oracle;
   let cvpToken;
 
-  let owner, timelockStub, sourceStub1, sourceStub2, powerOracle, alice, bob;
+  let owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter;
 
   before(async function() {
-    [owner, timelockStub, sourceStub1, sourceStub2, powerOracle, alice, bob] = await web3.eth.getAccounts();
+    [owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
     cvpToken = await MockCVP.new(ether(2000));
-    [owner, timelockStub, sourceStub1, sourceStub2, powerOracle, alice, bob] = await web3.eth.getAccounts();
+    staking = await MockStaking.new(cvpToken.address);
   });
 
   describe('initialization', () => {
-    it('should assign constructor args correctly', async function() {
-      staking = await PowerOracleTest.new(cvpToken.address);
-      expect(await staking.cvpToken()).to.be.equal(cvpToken.address);
-    });
-
-    it('should initialize correctly', async function() {
-      staking = await PowerOracleTest.new(cvpToken.address);
-      await staking.initialize(powerOracle, ether(300), ether(15), ether(20));
-
-      expect(await staking.powerOracle()).to.be.equal(powerOracle);
-      expect(await staking.minimalSlashingDeposit()).to.be.equal(ether(300));
-      expect(await staking.slasherRewardPct()).to.be.equal(ether(15));
-      expect(await staking.reservoirSlashingRewardPct()).to.be.equal(ether(20));
+    it('should assign constructor and initializer args correctly', async function() {
+      oracle = await deployProxied(
+        PowerOracle,
+        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        { proxyAdminOwner: owner }
+      );
+      expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
+      expect(await oracle.reservoir()).to.be.equal(reservoir);
+      expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
+      expect(await oracle.reportReward()).to.be.equal(REPORT_REWARD_IN_ETH);
+      expect(await oracle.maxCvpReward()).to.be.equal(MAX_CVP_REWARD);
+      expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
+      expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
     });
   })
+
+  describe('pokeFromReporter', () => {
+    beforeEach(async () => {
+      oracle = await deployProxied(
+        PowerOracle,
+        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        { proxyAdminOwner: owner }
+      );
+      await staking.setUser(1, validReporter, ether(300));
+      await staking.setReporter(1, ether(300));
+    });
+
+    it('should allow a valid reporter calling the method', async function() {
+      await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+    });
+
+    it('should deny another user calling an behalf of reporter', async function() {
+      await expect(oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: bob }))
+        .to.be.revertedWith('PowerOracleStaking::authorizeReporter: Invalid poker key');
+    });
+
+    it('should deny calling with an empty array', async function() {
+      await expect(oracle.pokeFromReporter(1, [], { from: validReporter }))
+        .to.be.revertedWith('PowerOracle::pokeFromReporter: Missing token symbols');
+    });
+
+    it('should deny poking with unknown token symbols', async function() {
+      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporter }))
+        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+
+    it('should deny poking with unknown token symbols', async function() {
+      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporter }))
+        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+
+    describe('rewards', () => {
+      it('should not reward a reporter for reporting CVP and ETH', async function() {
+        const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporter });
+        const resTimestamp = await getResTimestamp(res);
+
+        expectPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP'],
+          oldTimestamp: '0',
+          newTimestamp: resTimestamp
+        });
+
+        expectEvent(res, 'PokeFromReporter', {
+          reporterId: '1',
+          tokenCount: '2',
+          rewardCount: '0'
+        });
+        expectEvent(res, 'NothingToReward', {
+          userId: '1',
+        });
+      });
+
+      it('should update CVP/ETH along with', async function() {
+        const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporter });
+        const resTimestamp = await getResTimestamp(res);
+
+        expectPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI'],
+          oldTimestamp: '0',
+          newTimestamp: resTimestamp
+        });
+
+        expectEvent(res, 'PokeFromReporter', {
+          reporterId: '1',
+          tokenCount: '2',
+          rewardCount: '2'
+        });
+        expectEvent(res, 'RewardUser', {
+          userId: '1',
+          count: '2',
+          calculatedReward: '2'
+        });
+      });
+
+      it('should update but not reward a reporter if there is not enough time passed from the last report', async function() {
+        await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+        await time.increase(10);
+        const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+        const resTimestamp = await getResTimestamp(res);
+
+        expect(await oracle.rewards(1)).to.be.equal('1');
+
+        expectPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP', 'REP'],
+          oldTimestamp: '0',
+          newTimestamp: resTimestamp
+        })
+
+        expectEvent(res, 'PokeFromReporter', {
+          reporterId: '1',
+          tokenCount: '2',
+          rewardCount: '0'
+        });
+        expectEvent(res, 'NothingToReward', {
+          userId: '1',
+        });
+        expect(await oracle.rewards(1)).to.be.equal('1');
+      });
+
+      it('should partially update on partially outdated prices', async function() {
+        // 1st poke
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporter });
+        const firstTimestamp = await getResTimestamp(res);
+        expect(await oracle.rewards(1)).to.be.equal('3');
+
+        await time.increase(MIN_REPORT_INTERVAL_INT - 5);
+
+        // 2nd poke
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporter });
+        expect(await oracle.rewards(1)).to.be.equal('3');
+        await time.increase(20);
+
+        // 3rd poke
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+        const thirdTimestamp = await getResTimestamp(res);
+
+        expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
+
+        expectPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['CVP', 'REP', 'DAI', 'BTC'],
+          oldTimestamp: firstTimestamp,
+          newTimestamp: thirdTimestamp
+        })
+
+        expectEvent(res, 'PokeFromReporter', {
+          reporterId: '1',
+          tokenCount: '3',
+          rewardCount: '2'
+        });
+        expectEvent(res, 'RewardUser', {
+          userId: '1',
+          count: '2',
+          calculatedReward: '4818'
+        });
+      });
+
+      it('should fully update on fully outdated prices', async function() {
+        // 1st poke
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporter });
+        const firstTimestamp = await getResTimestamp(res);
+        expect(await oracle.rewards(1)).to.be.equal('3');
+
+        await time.increase(MIN_REPORT_INTERVAL_INT - 5);
+
+        // 2nd poke
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporter });
+        expect(await oracle.rewards(1)).to.be.equal('3');
+        // NOTICE: the only difference with the example above
+        await time.increase(120);
+
+        // 3rd poke
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+        const thirdTimestamp = await getResTimestamp(res);
+
+        expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
+
+        expectPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['CVP', 'REP', 'DAI', 'BTC'],
+          oldTimestamp: firstTimestamp,
+          newTimestamp: thirdTimestamp
+        })
+
+        expectEvent(res, 'PokeFromReporter', {
+          reporterId: '1',
+          tokenCount: '3',
+          rewardCount: '3'
+        });
+        expectEvent(res, 'RewardUser', {
+          userId: '1',
+          count: '3',
+          calculatedReward: '7227'
+        });
+      });
+    });
+  });
 });

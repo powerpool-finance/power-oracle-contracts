@@ -1,7 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { K, ether, deployProxied, getEventArg, keccak256 } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
-const { moveCvpPairToCP1 } = require('./builders');
 const { solidity } = require('ethereum-waffle');
 
 const chai = require('chai');
@@ -94,8 +93,8 @@ describe('IntegrationTest', function () {
     expect(await staking.getDepositOf(bobId)).to.be.equal(ether(50));
     expect(await staking.getDepositOf(charlieId)).to.be.equal(ether(30));
 
-    expect(await staking.reporterId()).to.be.equal(aliceId);
-    expect(await staking.highestDeposit()).to.be.equal(ether(100));
+    expect(await staking.getReporterId()).to.be.equal(aliceId);
+    expect(await staking.getHighestDeposit()).to.be.equal(ether(100));
 
     // 1st Poke (Initial)
     res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP', 'CVP'], { from: alicePoker });
@@ -103,16 +102,16 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
       tokenCount: '3',
-      rewardCount: '3'
+      rewardCount: '2'
     })
 
-    expectEvent(res, 'AccrueReward', {
+    expectEvent(res, 'RewardUser', {
       userId: '1',
-      count: '3',
-      calculatedReward: '3'
+      count: '2',
+      calculatedReward: '2'
     })
 
-    expect(await oracle.rewards(aliceId)).to.be.equal('3');
+    expect(await oracle.rewards(aliceId)).to.be.equal('2');
 
     await time.increase(40);
 
@@ -125,11 +124,11 @@ describe('IntegrationTest', function () {
       rewardCount: '0'
     })
 
-    expectEvent(res, 'NoRewardToAccrue', {
+    expectEvent(res, 'NothingToReward', {
       userId: '1',
     })
 
-    expect(await oracle.rewards(aliceId)).to.be.equal('3');
+    expect(await oracle.rewards(aliceId)).to.be.equal('2');
 
     await time.increase(65);
 
@@ -139,27 +138,23 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
       tokenCount: '3',
-      rewardCount: '3'
+      rewardCount: '2'
     })
 
-    expectEvent(res, 'AccrueReward', {
+    expectEvent(res, 'RewardUser', {
       userId: '1',
-      count: '3',
-      calculatedReward: '7227'
+      count: '2',
+      calculatedReward: '4818'
     })
 
-    expect(await oracle.rewards(aliceId)).to.be.equal('7230');
+    expect(await oracle.rewards(aliceId)).to.be.equal('4820');
 
     // 4th Poke from Slasher which fails
     res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP', 'CVP'], { from: bobPoker });
     expectEvent(res, 'PokeFromSlasher', {
       slasherId: '2',
       tokenCount: '3',
-      rewardCount: '0'
-    })
-
-    expectEvent(res, 'NoRewardToAccrue', {
-      userId: '2',
+      overdueCount: '0'
     })
 
     await time.increase(95);
@@ -169,13 +164,7 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromSlasher', {
       slasherId: '2',
       tokenCount: '3',
-      rewardCount: '3'
-    })
-
-    expectEvent(res, 'AccrueReward', {
-      userId: '2',
-      count: '3',
-      calculatedReward: '7227'
+      overdueCount: '3'
     })
 
     // Withdrawing rewards
@@ -183,9 +172,9 @@ describe('IntegrationTest', function () {
     await oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier });
     await expect(oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier }))
       .to.be.revertedWith('PowerOracle::withdrawRewards: Nothing to withdraw');
-    expect(await cvpToken.balanceOf(alice)).to.be.equal('7230');
+    expect(await cvpToken.balanceOf(alice)).to.be.equal('4820');
 
-    await cvpToken.transfer(reservoir, 7230, { from: alice });
+    await cvpToken.transfer(reservoir, 4820, { from: alice });
     // Withdraw stake
     expect(await cvpToken.balanceOf(alice)).to.be.equal('0');
     await expect(staking.withdraw(aliceId, alice, ether(101), { from: aliceFinancier }))
@@ -202,7 +191,7 @@ describe('IntegrationTest', function () {
     await expect(staking.setReporter(charlieId, { from: reservoir }))
       .to.be.revertedWith('PowerOracleStaking::setReporter: Insufficient candidate deposit');
 
-    expect(await staking.reporterId()).to.be.equal(bobId);
-    expect(await staking.highestDeposit()).to.be.equal(ether(50));
+    expect(await staking.getReporterId()).to.be.equal(bobId);
+    expect(await staking.getHighestDeposit()).to.be.equal(ether(50));
   });
 });
