@@ -16,6 +16,10 @@ contract MockStaking is PowerOracleStaking {
     emit MockSlash(slasherId_, overdueCount_);
   }
 
+  function setTotalDeposit(uint256 totalDeposit_) external {
+    totalDeposit = totalDeposit_;
+  }
+
   function setReporter(uint256 userId_, uint256 highestDeposit_) external {
     _reporterId = userId_;
     _highestDeposit = highestDeposit_;

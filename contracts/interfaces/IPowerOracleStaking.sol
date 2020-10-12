@@ -25,7 +25,7 @@ interface IPowerOracleStaking {
 
   /*** Owner Interface ***/
   /// The owner withdraws the diff between ERC20 balance and the actual total deposits tracker.
-  function withdrawExtraCVP() external;
+  function withdrawExtraCVP(address to) external;
 
   function setMinimalSlashingDeposit(uint256 amount) external;
 

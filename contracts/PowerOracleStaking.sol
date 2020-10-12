@@ -17,9 +17,9 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   event UpdateUser(uint256 indexed userId, address indexed adminKey, address pokerKey, address financierKey);
   event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
   event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
-  event WithdrawExtraCVP(bool indexed sent, uint256 erc20Balance, uint256 totalBalance);
+  event WithdrawExtraCVP(bool indexed sent, address indexed to, uint256 diff, uint256 erc20Balance, uint256 accountedTotalDeposits);
   event SetMinimalSlashingDeposit(uint256 amount);
-  event SetSlashingPct(uint256 slasherRewardPct, uint256 reservoirSlashingRewardPct);
+  event SetSlashingPct(uint256 slasherSlashingRewardPct, uint256 protocolSlashingRewardPct);
   event SetPowerOracle(address powerOracle);
   event SetReporter(uint256 indexed reporterId, address indexed msgSender);
   event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 slasherReward, uint256 reservoirReward);
@@ -44,8 +44,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   uint256 public totalDeposit;
   uint256 public minimalSlashingDeposit;
   /// 100 eth == 100%
-  uint256 public slasherRewardPct;
-  uint256 public reservoirSlashingRewardPct;
+  uint256 public slasherSlashingRewardPct;
+  uint256 public protocolSlashingRewardPct;
 
   uint256 internal _userIdCounter;
   uint256 internal _highestDeposit;
@@ -67,8 +67,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     _transferOwnership(owner_);
     powerOracle = powerOracle_;
     minimalSlashingDeposit = minimalSlashingDeposit_;
-    slasherRewardPct = slasherRewardPct_;
-    reservoirSlashingRewardPct = reservoirSlashingRewardPct_;
+    slasherSlashingRewardPct = slasherRewardPct_;
+    protocolSlashingRewardPct = reservoirSlashingRewardPct_;
   }
 
   /*** User Interface ***/
@@ -85,6 +85,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
 
     uint256 depositAfter = user.deposit.add(amount_);
     user.deposit = depositAfter;
+    totalDeposit = totalDeposit.add(amount_);
 
     uint256 highestDeposit = _highestDeposit;
     uint256 prevReporterId = _reporterId;
@@ -111,6 +112,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
 
     uint256 depositAfter = depositBefore - amount_;
     users[userId_].deposit = depositAfter;
+    totalDeposit = totalDeposit.sub(amount_);
 
     emit Withdraw(userId_, msg.sender, to_, amount_, depositAfter);
     cvpToken.transfer(to_, amount_);
@@ -157,28 +159,31 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     uint256 reporterDeposit = users[_reporterId].deposit;
 
     // uint256 slasherReward = reporterDeposit * slasherRewardPct / HUNDRED_PCT;
-    uint256 slasherReward = reporterDeposit.mul(slasherRewardPct) / HUNDRED_PCT;
+    uint256 slasherReward = reporterDeposit.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
     // uint256 reservoirReward = reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
-    uint256 reservoirReward = reporterDeposit.mul(reservoirSlashingRewardPct) / HUNDRED_PCT;
+    uint256 reservoirReward = reporterDeposit.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
 
     emit Slash(slasherId_, _reporterId, slasherReward, reservoirReward);
   }
 
   /*** Owner Interface ***/
 
-  function withdrawExtraCVP() external override onlyOwner {
+  function withdrawExtraCVP(address to_) external override onlyOwner {
+    require(to_ != address(0), "PowerOracleStaking::withdrawExtraCVP: Cant withdraw to 0 address");
+
     uint256 erc20Balance = cvpToken.balanceOf(address(this));
     uint256 totalBalance = totalDeposit;
     bool sent = false;
+    uint256 diff;
 
-    if (totalBalance > erc20Balance) {
-      uint256 diff = erc20Balance - totalBalance;
+    if (erc20Balance > totalBalance) {
+      diff = erc20Balance - totalBalance;
 
-      cvpToken.transfer(msg.sender, diff);
+      cvpToken.transfer(to_, diff);
       sent = true;
     }
 
-    emit WithdrawExtraCVP(sent, erc20Balance, totalBalance);
+    emit WithdrawExtraCVP(sent, to_, diff, erc20Balance, totalBalance);
   }
 
   function setMinimalSlashingDeposit(uint256 amount_) external override onlyOwner {
@@ -191,10 +196,15 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     emit SetPowerOracle(powerOracle_);
   }
 
-  function setSlashingPct(uint256 slasherRewardPct_, uint256 reservoirSlashingRewardPct_) external override onlyOwner {
-    slasherRewardPct = slasherRewardPct_;
-    reservoirSlashingRewardPct = reservoirSlashingRewardPct_;
-    emit SetSlashingPct(slasherRewardPct_, reservoirSlashingRewardPct_);
+  function setSlashingPct(uint256 slasherSlashingRewardPct_, uint256 protocolSlashingRewardPct_) external override onlyOwner {
+    require(
+      slasherSlashingRewardPct_.add(protocolSlashingRewardPct_) <= HUNDRED_PCT,
+      "PowerOracleStaking::setSlashingPct: Invalid reward sum"
+    );
+
+    slasherSlashingRewardPct = slasherSlashingRewardPct_;
+    protocolSlashingRewardPct = protocolSlashingRewardPct_;
+    emit SetSlashingPct(slasherSlashingRewardPct_, protocolSlashingRewardPct_);
   }
 
   /*** Permissionless Interface ***/

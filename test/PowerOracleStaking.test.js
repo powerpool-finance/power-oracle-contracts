@@ -14,8 +14,8 @@ MockCVP.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
 
 const MINIMAL_SLASHING_DEPOSIT = ether(50);
-const SLASHER_REWARD_PCT = ether(15);
-const RESERVOIR_SLASHING_REWARD_PCT = ether(5);
+const SLASHER_SLASHING_REWARD_PCT = ether(15);
+const PROTOCOL_SLASHING_REWARD_PCT = ether(5);
 
 describe('PowerOracleStaking', function () {
   let staking;
@@ -32,7 +32,7 @@ describe('PowerOracleStaking', function () {
     staking = await deployProxied(
       MockStaking,
       [cvpToken.address],
-      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_SLASHING_REWARD_PCT],
+      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT],
       { proxyAdminOwner: owner }
     );
   });
@@ -43,8 +43,8 @@ describe('PowerOracleStaking', function () {
       expect(await staking.owner()).to.be.equal(owner);
       expect(await staking.powerOracle()).to.be.equal(powerOracle);
       expect(await staking.minimalSlashingDeposit()).to.be.equal(MINIMAL_SLASHING_DEPOSIT);
-      expect(await staking.slasherRewardPct()).to.be.equal(SLASHER_REWARD_PCT);
-      expect(await staking.reservoirSlashingRewardPct()).to.be.equal(RESERVOIR_SLASHING_REWARD_PCT);
+      expect(await staking.slasherSlashingRewardPct()).to.be.equal(SLASHER_SLASHING_REWARD_PCT);
+      expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
     });
   })
 
@@ -146,6 +146,8 @@ describe('PowerOracleStaking', function () {
           depositAfter: ether(10)
         })
 
+        expect(await staking.totalDeposit()).to.be.equal(ether(10));
+
         res = await staking.deposit(1, ether(10), { from: charlie });
         expectEvent(res, 'Deposit', {
           userId: '1',
@@ -153,6 +155,8 @@ describe('PowerOracleStaking', function () {
           amount: ether(10),
           depositAfter: ether(20)
         })
+
+        expect(await staking.totalDeposit()).to.be.equal(ether(20));
       });
 
       it('should update the reporter and the highest deposit values if needed', async function() {
@@ -201,13 +205,18 @@ describe('PowerOracleStaking', function () {
 
       beforeEach(async () => {
         await staking.setUser(USER_ID, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+        await staking.setTotalDeposit(ether(100));
         await cvpToken.transfer(staking.address, ether(500), { from: deployer });
       });
 
       it('should allow the users financier key withdrawing all the deposit', async function() {
         expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        expect(await staking.totalDeposit()).to.be.equal(ether('100'));
+
         const res = await staking.withdraw(USER_ID, sink, ether(100), { from: aliceFinancier });
+
         expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('100'));
+        expect(await staking.totalDeposit()).to.be.equal(ether('0'));
 
         expectEvent(res, 'Withdraw', {
           userId: '42',
@@ -220,8 +229,12 @@ describe('PowerOracleStaking', function () {
 
       it('should allow the users financier key withdrawing part of the deposit', async function() {
         expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        expect(await staking.totalDeposit()).to.be.equal(ether('100'));
+
         const res = await staking.withdraw(USER_ID, sink, ether(30), { from: aliceFinancier });
+
         expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('30'));
+        expect(await staking.totalDeposit()).to.be.equal(ether('70'));
 
         expectEvent(res, 'Withdraw', {
           userId: '42',
@@ -244,4 +257,93 @@ describe('PowerOracleStaking', function () {
     });
   });
 
+  describe('owner interface', () => {
+    describe('withdrawExtraCvp', () => {
+      it('should allow the owner withdrawing accidentally sent CVPs from the contract', async function() {
+        await staking.setTotalDeposit(ether(100));
+        await cvpToken.transfer(staking.address, ether(120), { from: deployer });
+
+        expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        const res = await staking.withdrawExtraCVP(sink, { from: owner });
+        expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('20'));
+
+        expectEvent(res, 'WithdrawExtraCVP', {
+          sent: true,
+          to: sink,
+          diff: ether(20),
+          erc20Balance: ether(120),
+          accountedTotalDeposits: ether(100)
+        });
+      });
+
+      it('should not withdraw if there is no diff in accounted tokens', async function() {
+        await staking.setTotalDeposit(ether(100));
+        await cvpToken.transfer(staking.address, ether(100), { from: deployer });
+
+        expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        const res = await staking.withdrawExtraCVP(sink, { from: owner });
+        expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('0'));
+
+        expectEvent(res, 'WithdrawExtraCVP', {
+          sent: false,
+          to: sink,
+          diff: '0',
+          erc20Balance: ether(100),
+          accountedTotalDeposits: ether(100)
+        });
+      });
+
+      it('should deny non-owner calling the method', async function() {
+        await expect(staking.withdrawExtraCVP(sink, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+
+      it('should deny withdrawing to the 0 address', async function() {
+        await expect(staking.withdrawExtraCVP(constants.ZERO_ADDRESS, { from: owner }))
+          .to.be.revertedWith('PowerOracleStaking::withdrawExtraCVP: Cant withdraw to 0 address');
+      });
+    });
+
+    describe('setMinimalSlashingDeposit', () => {
+      it('should allow the owner setting the value', async function() {
+        await staking.setMinimalSlashingDeposit(42, { from: owner });
+        expect(await staking.minimalSlashingDeposit()).to.be.equal('42');
+      })
+
+      it('should deny non-owner setting the value', async function() {
+        await expect(staking.setMinimalSlashingDeposit(42, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      })
+    });
+
+    describe('setPowerOracle', () => {
+      it('should allow the owner setting the value', async function() {
+        await staking.setPowerOracle(charlie, { from: owner });
+        expect(await staking.powerOracle()).to.be.equal(charlie);
+      })
+
+      it('should deny non-owner setting the value', async function() {
+        await expect(staking.setPowerOracle(charlie, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      })
+    })
+
+    describe('setSlashingPct', () => {
+      it('should allow the owner setting the value', async function() {
+        await staking.setSlashingPct(ether(40), ether(30), { from: owner });
+        expect(await staking.slasherSlashingRewardPct()).to.be.equal(ether(40));
+        expect(await staking.protocolSlashingRewardPct()).to.be.equal(ether(30));
+      })
+
+      it('should deny a slasher and the protocol reward more than 100%', async function() {
+        await expect(staking.setSlashingPct(ether(50), ether(51), { from: owner }))
+          .to.be.revertedWith('PowerOracleStaking::setSlashingPct: Invalid reward sum');
+      })
+
+      it('should deny non-owner setting the value', async function() {
+        await expect(staking.setSlashingPct(ether(40), ether(30), { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      })
+    });
+  });
 });
