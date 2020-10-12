@@ -2,19 +2,20 @@
 
 pragma solidity ^0.6.12;
 
+import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./utils/Ownable.sol";
 import "./utils/SafeMath.sol";
 import "./interfaces/IERC20.sol";
 
-contract PowerOracleStaking is IPowerOracleStaking, Ownable {
+contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   using SafeMath for uint256;
 
   uint256 public constant HUNDRED_PCT = 100 ether;
 
-  event CreateUser(uint256 indexed userId, address indexed adminKey, address reporterKey, address financier);
-  event UpdateUser(uint256 indexed userId, address indexed adminKey, address reporterKey, address financier);
-  event Deposit(uint256 indexed userId, address indexed financier, uint256 amount, uint256 depositAfter);
+  event CreateUser(uint256 indexed userId, address indexed adminKey, address pokerKey, address financierKey, uint256 initialDeposit);
+  event UpdateUser(uint256 indexed userId, address indexed adminKey, address pokerKey, address financierKey);
+  event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
   event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
   event WithdrawExtraCVP(bool indexed sent, uint256 erc20Balance, uint256 totalBalance);
   event SetMinimalSlashingDeposit(uint256 amount);
@@ -57,11 +58,13 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   }
 
   function initialize(
+    address owner_,
     address powerOracle_,
     uint256 minimalSlashingDeposit_,
     uint256 slasherRewardPct_,
     uint256 reservoirSlashingRewardPct_
-  ) public {
+  ) public initializer {
+    _transferOwnership(owner_);
     powerOracle = powerOracle_;
     minimalSlashingDeposit = minimalSlashingDeposit_;
     slasherRewardPct = slasherRewardPct_;
@@ -73,8 +76,11 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   function deposit(uint256 userId_, uint256 amount_) external override {
     require(amount_ > 0, "PowerOracleStaking::deposit: missing amount");
 
+    _deposit(userId_, amount_);
+  }
+
+  function _deposit(uint256 userId_, uint256 amount_) internal {
     User storage user = users[userId_];
-    require(msg.sender == user.financierKey, "PowerOracleStaking::deposit: Only user's financier key allowed");
 
     uint256 depositAfter = user.deposit.add(amount_);
     user.deposit = depositAfter;
@@ -110,10 +116,16 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable {
   }
 
   /// Creates a new user ID and stores the given keys
-  function createUser(address adminKey_, address pokerKey_, address financierKey_) external override {
+  function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override {
     uint256 userId = ++_userIdCounter;
+
     users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
-    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_);
+
+    if (initialDeposit_ > 0) {
+      _deposit(userId, initialDeposit_);
+    }
+
+    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_, initialDeposit_);
   }
 
   /// Updates an existing user, only the current adminKey is eligible calling this method

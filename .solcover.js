@@ -2,6 +2,9 @@ const shell = require('shelljs');
 
 module.exports = {
   istanbulReporter: ['html'],
+  providerOptions: {
+    total_accounts: 30,
+  },
   mocha: {
     delay: false,
   },

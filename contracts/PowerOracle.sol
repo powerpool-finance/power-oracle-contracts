@@ -3,6 +3,7 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "./utils/Ownable.sol";
 import "./utils/SafeMath.sol";
 import "./interfaces/IERC20.sol";
@@ -12,7 +13,7 @@ import "./UniswapTWAPProvider.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 
 
-contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
+contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvider {
   using SafeMath for uint256;
 
   struct Price {
@@ -66,7 +67,6 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     reservoir = reservoir_;
   }
 
-  // TODO: make initializable
   function initialize(
     address owner_,
     address powerOracleStaking_,
@@ -74,7 +74,7 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     uint256 maxCvpReward_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
-  ) external {
+  ) external initializer {
     _transferOwnership(owner_);
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     reportReward = reportReward_;

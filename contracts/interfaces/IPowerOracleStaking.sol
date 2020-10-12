@@ -17,7 +17,7 @@ interface IPowerOracleStaking {
   function withdraw(uint256 userId_, address to_, uint256 amount_) external;
 
   /// Creates a new user ID and stores the given keys
-  function createUser(address adminKey_, address reporterKey_, address financierKey_) external;
+  function createUser(address adminKey_, address reporterKey_, address financierKey_, uint256 depositAmount) external;
 
   /// Updates an existing user, only the current adminKey is eligible calling this method
   function updateUser(uint256 userId, address adminKey_, address reporterKey_, address financierKey_) external;

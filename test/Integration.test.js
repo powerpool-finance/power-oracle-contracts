@@ -47,7 +47,7 @@ describe('IntegrationTest', function () {
     staking = await deployProxied(
       PowerOracleStaking,
       [cvpToken.address],
-      [constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
+      [owner, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
       { proxyAdminOwner: owner }
       );
 
@@ -73,11 +73,11 @@ describe('IntegrationTest', function () {
     await cvpToken.approve(staking.address, ether(100), { from: charlieFinancier });
 
     // Register
-    let res = await staking.createUser(alice, alicePoker, aliceFinancier, { from: bob });
+    let res = await staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob });
     const aliceId = getEventArg(res, 'CreateUser', 'userId');
-    res = await staking.createUser(bob, bobPoker, bobFinancier, { from: alice });
+    res = await staking.createUser(bob, bobPoker, bobFinancier, 0, { from: alice });
     const bobId = getEventArg(res, 'CreateUser', 'userId');
-    res = await staking.createUser(charlie, charlierReporter, charlieFinancier, { from: charlie });
+    res = await staking.createUser(charlie, charlierReporter, charlieFinancier, 0, { from: charlie });
     const charlieId = getEventArg(res, 'CreateUser', 'userId');
 
     expect(aliceId).to.be.equal('1');
