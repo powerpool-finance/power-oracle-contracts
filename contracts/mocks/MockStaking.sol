@@ -21,8 +21,10 @@ contract MockStaking is PowerOracleStaking {
     _highestDeposit = highestDeposit_;
   }
 
-  function setUser(uint256 userId_, address pokerKey, uint256 deposit_) external {
-    users[userId_].pokerKey = pokerKey;
+  function setUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_, uint256 deposit_) external {
+    users[userId_].adminKey = adminKey_;
+    users[userId_].pokerKey = pokerKey_;
+    users[userId_].financierKey = financierKey_;
     users[userId_].deposit = deposit_;
   }
 

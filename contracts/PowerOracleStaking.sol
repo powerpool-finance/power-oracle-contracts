@@ -74,7 +74,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   /*** User Interface ***/
 
   function deposit(uint256 userId_, uint256 amount_) external override {
-    require(amount_ > 0, "PowerOracleStaking::deposit: missing amount");
+    require(amount_ > 0, "PowerOracleStaking::deposit: Missing amount");
+    require(users[userId_].adminKey != address(0), "PowerOracleStaking::deposit: Admin key can't be empty");
 
     _deposit(userId_, amount_);
   }
@@ -91,7 +92,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
       _highestDeposit = depositAfter;
       _reporterId = userId_;
 
-      emit ReporterChange(_reporterId, userId_, highestDeposit, users[prevReporterId].deposit, depositAfter);
+      emit ReporterChange(prevReporterId, userId_, highestDeposit, users[prevReporterId].deposit, depositAfter);
     }
 
     emit Deposit(userId_, msg.sender, amount_, depositAfter);

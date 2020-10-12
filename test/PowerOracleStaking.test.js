@@ -21,10 +21,10 @@ describe('PowerOracleStaking', function () {
   let staking;
   let cvpToken;
 
-  let deployer, owner, timelockStub, sourceStub1, sourceStub2, powerOracle, alice, bob, alicePoker, aliceFinancier, bobPoker, bobFinancier;
+  let deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink;
 
   before(async function() {
-    [deployer, owner, timelockStub, sourceStub1, sourceStub2, powerOracle, alice, bob, alicePoker, aliceFinancier, bobPoker, bobFinancier] = await web3.eth.getAccounts();
+    [deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -126,5 +126,122 @@ describe('PowerOracleStaking', function () {
           .to.be.revertedWith('PowerOracleStaking::updateUser: Only admin allowed');
       });
     });
+
+    describe('deposit', () => {
+      beforeEach(async () => {
+        await staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob });
+      });
+
+      it('should allow anyone depositing multiple times for a given user ID', async function() {
+        await cvpToken.transfer(bob, ether(50), { from: deployer });
+        await cvpToken.transfer(charlie, ether(50), { from: deployer });
+        await cvpToken.approve(staking.address, ether(50), { from: bob });
+        await cvpToken.approve(staking.address, ether(50), { from: charlie });
+
+        let res = await staking.deposit(1, ether(10), { from: bob });
+        expectEvent(res, 'Deposit', {
+          userId: '1',
+          depositor: bob,
+          amount: ether(10),
+          depositAfter: ether(10)
+        })
+
+        res = await staking.deposit(1, ether(10), { from: charlie });
+        expectEvent(res, 'Deposit', {
+          userId: '1',
+          depositor: charlie,
+          amount: ether(10),
+          depositAfter: ether(20)
+        })
+      });
+
+      it('should update the reporter and the highest deposit values if needed', async function() {
+        await staking.createUser(bob, bobPoker, bobFinancier, 0, { from: bob });
+
+        await cvpToken.transfer(bob, ether(150), { from: deployer });
+        await cvpToken.approve(staking.address, ether(150), { from: bob });
+
+        expect(await staking.getReporterId()).to.be.equal('0');
+
+        let res = await staking.deposit(1, ether(10), { from: bob });
+        expectEvent(res, 'ReporterChange', {
+          prevId: '0',
+          nextId: '1',
+          highestDepositPrev: '0',
+          actualDepositPrev: '0',
+          actualDepositNext: ether(10),
+        })
+
+        res = await staking.deposit(2, ether(15), { from: bob });
+        expectEvent(res, 'ReporterChange', {
+          prevId: '1',
+          nextId: '2',
+          highestDepositPrev: ether(10),
+          actualDepositPrev: ether(10),
+          actualDepositNext: ether(15),
+        })
+
+        res = await staking.deposit(1, ether(5), { from: bob });
+        expectEvent.notEmitted(res, 'ReporterChange')
+      });
+
+      it('should deny depositing 0 ', async function() {
+        await expect(staking.deposit(1, 0, { from: bob }))
+          .to.be.revertedWith('PowerOracleStaking::deposit: Missing amount');
+      });
+
+      it('should deny depositing for a non-existing user', async function() {
+        await expect(staking.deposit(3, ether(30), { from: bob }))
+          .to.be.revertedWith('PowerOracleStaking::deposit: Admin key can\'t be empty');
+      });
+    })
+
+    describe('withdraw', () => {
+      const USER_ID = 42;
+
+      beforeEach(async () => {
+        await staking.setUser(USER_ID, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+        await cvpToken.transfer(staking.address, ether(500), { from: deployer });
+      });
+
+      it('should allow the users financier key withdrawing all the deposit', async function() {
+        expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        const res = await staking.withdraw(USER_ID, sink, ether(100), { from: aliceFinancier });
+        expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('100'));
+
+        expectEvent(res, 'Withdraw', {
+          userId: '42',
+          financier: aliceFinancier,
+          to: sink,
+          amount: ether(100),
+          depositAfter: '0'
+        });
+      });
+
+      it('should allow the users financier key withdrawing part of the deposit', async function() {
+        expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+        const res = await staking.withdraw(USER_ID, sink, ether(30), { from: aliceFinancier });
+        expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('30'));
+
+        expectEvent(res, 'Withdraw', {
+          userId: '42',
+          financier: aliceFinancier,
+          to: sink,
+          amount: ether(30),
+          depositAfter: ether(70)
+        });
+      });
+
+      it('should deny non-financier withdrawing rewards', async function() {
+        await expect(staking.withdraw(USER_ID, sink, ether(30), { from: alice }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Only user\'s financier key allowed');
+      });
+
+      it('should deny withdrawing more than the rewards balance', async function() {
+        await expect(staking.withdraw(USER_ID, sink, ether(101), { from: aliceFinancier }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
+      });
+    });
   });
+
 });
