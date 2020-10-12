@@ -7,14 +7,14 @@ const { solidity } = require('ethereum-waffle');
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
 const MockStaking = artifacts.require('MockStaking');
-const PowerOracle = artifacts.require('PowerOracle');
+const MockOracle = artifacts.require('MockOracle');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
-PowerOracle.numberFormat = 'String';
+MockOracle.numberFormat = 'String';
 
 const DAI_SYMBOL_HASH = keccak256('DAI');
 const ETH_SYMBOL_HASH = keccak256('ETH');
@@ -47,25 +47,28 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher;
+  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher, aliceFinancier, sink;
 
   before(async function() {
-    [owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher] = await web3.eth.getAccounts();
+    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher, aliceFinancier, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
-    cvpToken = await MockCVP.new(ether(2000));
+    cvpToken = await MockCVP.new(ether(100000));
     staking = await MockStaking.new(cvpToken.address);
+    oracle = await deployProxied(
+      MockOracle,
+      [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+      [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      { proxyAdminOwner: owner }
+    );
+
+    await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
+    await cvpToken.approve(oracle.address, ether(100000), { from: reservoir });
   });
 
   describe('initialization', () => {
     it('should assign constructor and initializer args correctly', async function() {
-      oracle = await deployProxied(
-        PowerOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
-        { proxyAdminOwner: owner }
-      );
       expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
       expect(await oracle.reservoir()).to.be.equal(reservoir);
       expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
@@ -78,12 +81,6 @@ describe('PowerOracle', function () {
 
   describe('pokeFromReporter', () => {
     beforeEach(async () => {
-      oracle = await deployProxied(
-        PowerOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
-        { proxyAdminOwner: owner }
-      );
       await staking.setUser(1, validReporter, ether(300));
       await staking.setReporter(1, ether(300));
     });
@@ -264,12 +261,6 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
-      oracle = await deployProxied(
-        PowerOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
-        { proxyAdminOwner: owner }
-      );
       await staking.setUser(1, validReporter, ether(300));
       await staking.setReporter(1, ether(300));
       await staking.setUser(2, validSlasher, ether(100));
@@ -375,15 +366,6 @@ describe('PowerOracle', function () {
   });
 
   describe('poke (permissionless)', () => {
-    beforeEach(async () => {
-      oracle = await deployProxied(
-        PowerOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
-        { proxyAdminOwner: owner }
-      );
-    });
-
     it('should allow anyone calling the poke method', async function() {
       let res = await oracle.poke(['REP', 'DAI', 'BTC'], { from: alice });
       const firstTimestamp = await getResTimestamp(res);
@@ -422,6 +404,34 @@ describe('PowerOracle', function () {
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+  });
+
+  describe('withdrawing rewards', async function() {
+    const USER_ID = 4;
+    beforeEach(async () => {
+      await oracle.setUserReward(USER_ID, ether(250));
+      await staking.setUserFinancier(USER_ID, aliceFinancier)
+    })
+
+    it('should allow a valid user withdrawing their rewards', async function() {
+      expect(await oracle.rewards(USER_ID)).to.be.equal(ether(250));
+
+      expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
+      await oracle.withdrawRewards(USER_ID, sink, { from: aliceFinancier });
+      expect(await cvpToken.balanceOf(sink)).to.be.equal(ether(250));
+
+      expect(await oracle.rewards(USER_ID)).to.be.equal(ether(0));
+    });
+
+    it('should deny non-financier key withdrawing users rewards', async function() {
+      await expect(oracle.withdrawRewards(USER_ID, sink, { from: alice }))
+        .to.be.revertedWith('PowerOracleStaking::requireValidFinancier: Invalid financier');
+    });
+
+    it('should deny withdrawing to 0 address', async function() {
+      await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: aliceFinancier }))
+        .to.be.revertedWith("PowerOracle::withdrawRewards: Can't withdraw to 0 address");
     });
   });
 });

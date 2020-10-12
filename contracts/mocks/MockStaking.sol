@@ -26,6 +26,10 @@ contract MockStaking is PowerOracleStaking {
     users[userId_].deposit = deposit_;
   }
 
+  function setUserFinancier(uint256 userId_, address financierKey_) external {
+    users[userId_].financierKey = financierKey_;
+  }
+
   function setUserDeposit(uint256 userId_, uint256 deposit_) external {
     users[userId_].deposit = deposit_;
   }
