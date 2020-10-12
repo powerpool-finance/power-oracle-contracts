@@ -62,6 +62,8 @@
     "clean": "buidler clean",
     "compile": "buidler compile",
     "coverage": "buidler coverage --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
+    "deploy:testnet:local": "buidler deploy-testnet --network local",
+    "deploy:testnet:kovan": "buidler deploy-testnet --network kovan",
     "lint:sol": "solhint --config ./.solhint.json --max-warnings 0 \"contracts/**/*.sol\"",
     "lint:js": "eslint --config .eslintrc.json --ignore-path ./.eslintignore --ext .js .",
     "node": "buidler node",
