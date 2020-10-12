@@ -59,7 +59,7 @@ describe('PowerOracle', function () {
     oracle = await deployProxied(
       MockOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
     );
 
@@ -69,6 +69,7 @@ describe('PowerOracle', function () {
 
   describe('initialization', () => {
     it('should assign constructor and initializer args correctly', async function() {
+      expect(await oracle.owner()).to.be.equal(owner);
       expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
       expect(await oracle.reservoir()).to.be.equal(reservoir);
       expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
@@ -432,6 +433,57 @@ describe('PowerOracle', function () {
     it('should deny withdrawing to 0 address', async function() {
       await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: aliceFinancier }))
         .to.be.revertedWith("PowerOracle::withdrawRewards: Can't withdraw to 0 address");
+    });
+  });
+
+  describe('owner methods', () => {
+    describe('setReportReward', () => {
+      it('should allow the owner setting a new report reward', async function() {
+        await oracle.setReportReward(42, { from: owner });
+        expect(await oracle.reportReward()).to.be.equal('42');
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setReportReward(42, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setMaxCvpReward', () => {
+      it('should allow the owner setting a new report reward', async function() {
+        await oracle.setMaxCvpReward(333, { from: owner });
+        expect(await oracle.maxCvpReward()).to.be.equal('333');
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setMaxCvpReward(333, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setPowerOracleStaking', () => {
+      it('should allow the owner setting a new report reward', async function() {
+        await oracle.setPowerOracleStaking(sink, { from: owner });
+        expect(await oracle.powerOracleStaking()).to.be.equal(sink);
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setPowerOracleStaking(sink, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setReportIntervals', () => {
+      it('should allow the owner setting a new report reward', async function() {
+        await oracle.setReportIntervals(222, 333, { from: owner });
+        expect(await oracle.minReportInterval()).to.be.equal('222');
+        expect(await oracle.maxReportInterval()).to.be.equal('333');
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setReportIntervals(222, 333, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
     });
   });
 });

@@ -36,6 +36,8 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
   event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
   event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 overdueCount);
   event Poke(address indexed poker, uint256 tokenCount);
+  event SetMaxCvpReward(uint256 maxCvpReward);
+  event SetPowerOracleStaking(address powerOracleStaking);
 
   IERC20 public immutable cvpToken;
   address public immutable reservoir;
@@ -66,12 +68,14 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
 
   // TODO: make initializable
   function initialize(
+    address owner_,
     address powerOracleStaking_,
     uint256 reportReward_,
     uint256 maxCvpReward_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
   ) external {
+    _transferOwnership(owner_);
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     reportReward = reportReward_;
     maxCvpReward = maxCvpReward_;
@@ -237,11 +241,21 @@ contract PowerOracle is IPowerOracle, UniswapTWAPProvider, Ownable {
     emit SetReportReward(reportReward_);
   }
 
+  function setMaxCvpReward(uint256 maxCvpReward_) external override onlyOwner {
+    maxCvpReward = maxCvpReward_;
+    emit SetMaxCvpReward(maxCvpReward_);
+  }
+
   /// The owner sets the current report min/max in seconds
   function setReportIntervals(uint256 minReportInterval_, uint256 maxReportInterval_) external override onlyOwner {
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
     emit SetReportIntervals(minReportInterval_, maxReportInterval_);
+  }
+
+  function setPowerOracleStaking(address powerOracleStaking_) external override onlyOwner {
+    powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
+    emit SetPowerOracleStaking(powerOracleStaking_);
   }
 
   /*** Viewers ***/

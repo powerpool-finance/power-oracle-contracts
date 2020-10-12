@@ -20,9 +20,13 @@ interface IPowerOracle {
 
   /*** Owner Interface ***/
   /// The owner sets the current reward per report in ETH tokens
-  function setReportReward(uint256 reportReward) external ;
+  function setReportReward(uint256 reportReward) external;
 
-  /// The owner sets the current report min/max in seconds
+  function setMaxCvpReward(uint256 maxCvpReward) external;
+
+  function setPowerOracleStaking(address powerOracleStaking) external;
+
+    /// The owner sets the current report min/max in seconds
   function setReportIntervals(uint256 minInterval, uint256 maxInterval) external;
 
 

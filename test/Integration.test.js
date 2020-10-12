@@ -54,7 +54,7 @@ describe('IntegrationTest', function () {
     oracle = await deployProxied(
       PowerOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
       );
 
