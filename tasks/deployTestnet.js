@@ -93,6 +93,9 @@ task('deploy-testnet', 'Deploys testnet contracts')
     txs = [];
     const snapshot = JSON.parse(fs.readFileSync('./tmp/pairValues.json').toString('utf-8'));
     for (const symbol of withPairKeys) {
+      if (symbol === 'ETH') {
+        break;
+      }
       console.log('>>> Adding liquidity to', symbol);
       const token1 = await MockERC20.at(deployed[totalErc20StubsToDeploy.indexOf(symbol)].address);
       const token2 = await MockERC20.at(deployed[totalErc20StubsToDeploy.indexOf('ETH')].address);
@@ -105,8 +108,8 @@ task('deploy-testnet', 'Deploys testnet contracts')
         token2.address,
         // snapshot[symbol].reserve0,
         // snapshot[symbol].reserve1,
-        5,
-        5,
+        ether('5'),
+        ether('5'),
         0,
         0,
         deployer,
