@@ -16,6 +16,8 @@ import "./interfaces/IPowerOracleStaking.sol";
 contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvider {
   using SafeMath for uint256;
 
+  uint256 public constant REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT = 100;
+
   struct Price {
     uint128 timestamp;
     uint128 value;
@@ -31,6 +33,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
   event RewardIgnored(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint256 calculatedReward, uint maxCvpReward);
 
   event NothingToReward(uint256 indexed userId, uint ethPrice);
+  event RewardAddress(address indexed to, uint256 count, uint256 amount);
 
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint price);
@@ -221,6 +224,21 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
       return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
     }
     revert("UniswapTWAPProvider::priceInternal: Unsupported case");
+  }
+
+  function rewardAddress(address to_, uint256 count_) public override virtual {
+    require(msg.sender == address(powerOracleStaking), "PowerOracle::rewardUser: Only Staking contract allowed");
+    require(count_ < REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT, "PowerOracle::rewardUser: Count has a hard limit of 100");
+    require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
+
+    uint256 ethPrice = _updateEthPrice();
+    uint256 cvpPrice = _updateCvpPrice();
+
+    uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
+    if (amount > 0) {
+      cvpToken.transferFrom(reservoir, to_, amount);
+    }
+    emit RewardAddress(to_, count_, amount);
   }
 
   /// Withdraw available rewards

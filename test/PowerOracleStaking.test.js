@@ -1,10 +1,12 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { K, ether, deployProxied } = require('./helpers');
+const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
+const MockOracle = artifacts.require('MockOracle');
 const MockStaking = artifacts.require('MockStaking');
 
 chai.use(solidity);
@@ -16,6 +18,7 @@ MockStaking.numberFormat = 'String';
 const MINIMAL_SLASHING_DEPOSIT = ether(50);
 const SLASHER_SLASHING_REWARD_PCT = ether(15);
 const PROTOCOL_SLASHING_REWARD_PCT = ether(5);
+const SET_USER_REWARD_COUNT = 3;
 
 describe('PowerOracleStaking', function () {
   let staking;
@@ -32,7 +35,7 @@ describe('PowerOracleStaking', function () {
     staking = await deployProxied(
       MockStaking,
       [cvpToken.address],
-      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT],
+      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT],
       { proxyAdminOwner: owner }
     );
   });
@@ -45,6 +48,7 @@ describe('PowerOracleStaking', function () {
       expect(await staking.minimalSlashingDeposit()).to.be.equal(MINIMAL_SLASHING_DEPOSIT);
       expect(await staking.slasherSlashingRewardPct()).to.be.equal(SLASHER_SLASHING_REWARD_PCT);
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
+      expect(await staking.setUserRewardCount()).to.be.equal(SET_USER_REWARD_COUNT.toString());
     });
   })
 
@@ -344,6 +348,52 @@ describe('PowerOracleStaking', function () {
         await expect(staking.setSlashingPct(ether(40), ether(30), { from: alice }))
           .to.be.revertedWith('Ownable: caller is not the owner');
       })
+    });
+  });
+
+  describe('setReporter', () => {
+    beforeEach(async function() {
+      const powerOracle = await MockOracle.new(cvpToken.address, constants.ZERO_ADDRESS, 1, await getTokenConfigs());
+      await staking.setPowerOracle(powerOracle.address, { from: owner });
+    });
+
+    it('should allow setting reporter if there is another user with a higher deposit', async function() {
+      await staking.setUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.setUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
+
+      await staking.mockSetReporter(1, ether(300));
+      expect(await staking.getReporterId()).to.be.equal('1');
+      expect(await staking.getHighestDeposit()).to.be.equal(ether(300));
+
+      await staking.setReporter(2);
+      expect(await staking.getReporterId()).to.be.equal('2');
+      expect(await staking.getHighestDeposit()).to.be.equal(ether(200));
+    });
+
+    it('should reward a setter', async function() {
+      await staking.setUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.setUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
+
+      await staking.mockSetReporter(1, ether(300));
+
+      expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
+      const res = await staking.setReporter(2, { from: charlie });
+      expectEvent(res, 'SetReporter', {
+        reporterId: '2',
+        msgSender: charlie
+      })
+      expectEvent(res, 'ReporterChange', {
+        prevId: '1',
+        nextId: '2',
+        highestDepositPrev: ether(300),
+        actualDepositPrev: ether(100),
+        actualDepositNext: ether(200)
+      })
+      expectEvent.inTransaction(res.tx, MockOracle, 'MockRewardAddress', {
+        to: charlie,
+        count: '3'
+      })
+      expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
     });
   });
 });

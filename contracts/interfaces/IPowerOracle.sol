@@ -17,6 +17,9 @@ interface IPowerOracle {
   /// Withdraw available rewards
   function withdrawRewards(uint256 userId, address to) external;
 
+  /*** PowerOracleStaking Interface ***/
+  function rewardAddress(address to, uint256 count) external;
+
 
   /*** Owner Interface ***/
   /// The owner sets the current reward per report in ETH tokens

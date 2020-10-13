@@ -47,10 +47,10 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher, aliceFinancier, sink;
+  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, aliceFinancier, sink;
 
   before(async function() {
-    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporter, validSlasher, aliceFinancier, sink] = await web3.eth.getAccounts();
+    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, aliceFinancier, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -82,12 +82,12 @@ describe('PowerOracle', function () {
 
   describe('pokeFromReporter', () => {
     beforeEach(async () => {
-      await staking.setUser(1, validReporter, ether(300));
-      await staking.setReporter(1, ether(300));
+      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetReporter(1, ether(300));
     });
 
     it('should allow a valid reporter calling the method', async function() {
-      await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+      await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
     });
 
     it('should deny another user calling an behalf of reporter', async function() {
@@ -96,23 +96,23 @@ describe('PowerOracle', function () {
     });
 
     it('should deny calling with an empty array', async function() {
-      await expect(oracle.pokeFromReporter(1, [], { from: validReporter }))
+      await expect(oracle.pokeFromReporter(1, [], { from: validReporterPoker }))
         .to.be.revertedWith('PowerOracle::pokeFromReporter: Missing token symbols');
     });
 
     it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporter }))
+      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
 
     it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporter }))
+      await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
 
     describe('rewards', () => {
       it('should not reward a reporter for reporting CVP and ETH', async function() {
-        const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporter });
+        const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporterPoker });
         const resTimestamp = await getResTimestamp(res);
 
         expectPriceUpdateEvent({
@@ -133,7 +133,7 @@ describe('PowerOracle', function () {
       });
 
       it('should update CVP/ETH along with', async function() {
-        const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporter });
+        const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporterPoker });
         const resTimestamp = await getResTimestamp(res);
 
         expectPriceUpdateEvent({
@@ -156,9 +156,9 @@ describe('PowerOracle', function () {
       });
 
       it('should update but not reward a reporter if there is not enough time passed from the last report', async function() {
-        await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+        await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
         await time.increase(10);
-        const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporter });
+        const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
         const resTimestamp = await getResTimestamp(res);
 
         expect(await oracle.rewards(1)).to.be.equal('1');
@@ -183,19 +183,19 @@ describe('PowerOracle', function () {
 
       it('should partially update on partially outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporter });
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const firstTimestamp = await getResTimestamp(res);
         expect(await oracle.rewards(1)).to.be.equal('3');
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
-        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporter });
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
         expect(await oracle.rewards(1)).to.be.equal('3');
         await time.increase(20);
 
         // 3rd poke
-        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const thirdTimestamp = await getResTimestamp(res);
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
@@ -221,20 +221,20 @@ describe('PowerOracle', function () {
 
       it('should fully update on fully outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporter });
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const firstTimestamp = await getResTimestamp(res);
         expect(await oracle.rewards(1)).to.be.equal('3');
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
-        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporter });
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
         expect(await oracle.rewards(1)).to.be.equal('3');
         // NOTICE: the only difference with the example above
         await time.increase(120);
 
         // 3rd poke
-        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const thirdTimestamp = await getResTimestamp(res);
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
@@ -262,16 +262,16 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
-      await staking.setUser(1, validReporter, ether(300));
-      await staking.setReporter(1, ether(300));
-      await staking.setUser(2, validSlasher, ether(100));
+      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetReporter(1, ether(300));
+      await staking.setUser(2, alice, validSlasherPoker, alice, ether(100));
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
-      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       const firstTimestamp = await getResTimestamp(res);
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
       expectEvent(res, 'PokeFromSlasher', {
@@ -295,15 +295,15 @@ describe('PowerOracle', function () {
 
     it('should allow a valid slasher calling a method when prices are partially outdated', async function() {
       // 1st poke
-      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
       const firstTimestamp = await getResTimestamp(res);
 
       // 2nd poke
-      await oracle.pokeFromReporter(1, ['REP'], { from: validReporter });
+      await oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker });
 
       // 3rd poke
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
       expectEvent(res, 'PokeFromSlasher', {
@@ -327,11 +327,11 @@ describe('PowerOracle', function () {
 
     it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
       // 1st poke
-      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporter });
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       await time.increase(5);
 
       // 2nd poke
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasher });
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
       expectEvent(res, 'PokeFromSlasher', {
@@ -356,12 +356,12 @@ describe('PowerOracle', function () {
     });
 
     it('should deny calling with an empty array', async function() {
-      await expect(oracle.pokeFromSlasher(2, [], { from: validSlasher }))
+      await expect(oracle.pokeFromSlasher(2, [], { from: validSlasherPoker }))
         .to.be.revertedWith('PowerOracle::pokeFromSlasher: Missing token symbols');
     });
 
     it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasher }))
+      await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasherPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
   });

@@ -4,6 +4,7 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "./interfaces/IPowerOracleStaking.sol";
+import "./interfaces/IPowerOracle.sol";
 import "./utils/Ownable.sol";
 import "./utils/SafeMath.sol";
 import "./interfaces/IERC20.sol";
@@ -46,6 +47,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   /// 100 eth == 100%
   uint256 public slasherSlashingRewardPct;
   uint256 public protocolSlashingRewardPct;
+  uint256 public setUserRewardCount;
 
   uint256 internal _userIdCounter;
   uint256 internal _highestDeposit;
@@ -62,13 +64,15 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     address powerOracle_,
     uint256 minimalSlashingDeposit_,
     uint256 slasherRewardPct_,
-    uint256 reservoirSlashingRewardPct_
+    uint256 reservoirSlashingRewardPct_,
+    uint256 setUserRewardCount_
   ) public initializer {
     _transferOwnership(owner_);
     powerOracle = powerOracle_;
     minimalSlashingDeposit = minimalSlashingDeposit_;
     slasherSlashingRewardPct = slasherRewardPct_;
     protocolSlashingRewardPct = reservoirSlashingRewardPct_;
+    setUserRewardCount = setUserRewardCount_;
   }
 
   /*** User Interface ***/
@@ -212,12 +216,18 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   /// Set a given address as a reporter if his deposit is higher than the current highestDeposit
   function setReporter(uint256 candidateId_) external override {
     uint256 candidateDeposit = users[candidateId_].deposit;
-    uint256 currentDeposit = users[_reporterId].deposit;
-    require(candidateDeposit > currentDeposit, "PowerOracleStaking::setReporter: Insufficient candidate deposit");
+    uint256 prevReporterId = _reporterId;
+    uint256 currentReporterDeposit = users[prevReporterId].deposit;
+
+    require(candidateDeposit > currentReporterDeposit, "PowerOracleStaking::setReporter: Insufficient candidate deposit");
+
+    emit ReporterChange(prevReporterId, candidateId_, _highestDeposit, currentReporterDeposit, candidateDeposit);
+    emit SetReporter(candidateId_, msg.sender);
+
     _highestDeposit = candidateDeposit;
     _reporterId = candidateId_;
 
-    emit SetReporter(candidateId_, msg.sender);
+    IPowerOracle(powerOracle).rewardAddress(msg.sender, setUserRewardCount);
   }
 
   /*** Viewers ***/
