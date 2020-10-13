@@ -1,5 +1,6 @@
 const fs = require('fs');
 usePlugin('@nomiclabs/buidler-truffle5');
+const pIteration = require('p-iteration');
 
 
 task('deploy-testnet', 'Deploys testnet contracts')
@@ -33,6 +34,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     PowerOracleStaking.numberFormat = 'String';
     PowerOracle.numberFormat = 'String';
 
+    const networkId = await web3.eth.net.getId();
     const [deployer] = await web3.eth.getAccounts();
     console.log('Deployer address is', deployer);
 
@@ -47,6 +49,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     const uniswapPairs = require('../config/uniswapPairs');
     const withPairKeys = Object.keys(uniswapPairs.withPair);
+    withPairKeys.push('USDC');
     const cToken = {};
     const totalErc20StubsToDeploy = withPairKeys.concat(uniswapPairs.noPair);
 
@@ -56,12 +59,9 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('>>> cToken to deploy', cToken);
 
     console.log('>>> Deploying underlying token stubs...');
-    let txs = [];
-    totalErc20StubsToDeploy.forEach(k => {
-      txs.push(MockERC20.new(k, k, I1E30));
-    })
-
-    const deployed = await Promise.all(txs);
+    const deployed = await pIteration.mapSeries(totalErc20StubsToDeploy, (k) => {
+      return MockERC20.new(k, k, I1E30);
+    });
 
     console.log('>>> Stub tokens deployed');
     console.log('>>> Deploying uniswap factory...');
@@ -73,35 +73,42 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     console.log('>>> Deploying uniswap pairs...');
 
-    txs = [];
+    console.log('withPairKeys', withPairKeys);
+    const pairBySymbol = {};
 
-    withPairKeys.forEach((symbol, p) => {
-      if (['ETH', 'USDT', 'USDC'].includes(symbol)) {
+    const deployedPairs = await pIteration.mapSeries(withPairKeys, async (symbol) => {
+      if (['ETH', 'USDT'].includes(symbol)) {
         return;
       }
       const token1 = deployed[totalErc20StubsToDeploy.indexOf(symbol)].address;
       const token2 = deployed[totalErc20StubsToDeploy.indexOf('ETH')].address;
 
-      txs.push(factory.createPair(token1, token2));
-    });
-
-    const deployedPairs = (await Promise.all(txs)).map(res => res.logs[0].args.pair);
+      return {
+        symbol,
+        res: await factory.createPair(token1, token2)
+      };
+    }).then(arr => arr.filter(v => v).map(({res, symbol}) => {
+      pairBySymbol[symbol] = res.logs[0].args.pair;
+      if(symbol === 'USDC') {
+        pairBySymbol['ETH'] = res.logs[0].args.pair;
+      }
+      return res.logs[0].args.pair;
+    }));
     console.log('>>> Deployed pairs', deployedPairs);
 
     console.log('>>> Depositing to uniswap pairs...');
 
-    txs = [];
     const snapshot = JSON.parse(fs.readFileSync('./tmp/pairValues.json').toString('utf-8'));
     for (const symbol of withPairKeys) {
       if (symbol === 'ETH') {
-        break;
+        continue;
       }
       console.log('>>> Adding liquidity to', symbol);
       const token1 = await MockERC20.at(deployed[totalErc20StubsToDeploy.indexOf(symbol)].address);
       const token2 = await MockERC20.at(deployed[totalErc20StubsToDeploy.indexOf('ETH')].address);
 
-      await token1.approve(router.address, snapshot[symbol].reserve0);
-      await token2.approve(router.address, snapshot[symbol].reserve1);
+      await token1.approve(router.address, snapshot[symbol] ? snapshot[symbol].reserve0 : ether('1000'));
+      await token2.approve(router.address, snapshot[symbol] ? snapshot[symbol].reserve1 : ether('1000'));
 
       await router.addLiquidity(
         token1.address,
@@ -120,31 +127,33 @@ task('deploy-testnet', 'Deploys testnet contracts')
     let custom;
     async function getTokenConfigs() {
       custom = [
-        {cToken: cToken.ETH, underlying: constants.ZERO_ADDRESS, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: uniswapPairs.withPair.ETH.pair, isUniswapReversed: true},
-        {cToken: cToken.USDT, underlying: deployed[totalErc20StubsToDeploy.indexOf('USDT')].address, symbolHash: keccak256('USDT'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
-        {cToken: cToken.USDC, underlying: deployed[totalErc20StubsToDeploy.indexOf('USDC')].address, symbolHash: keccak256('USDC'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
+        {cToken: cToken.ETH, underlying: deployed[totalErc20StubsToDeploy.indexOf('ETH')].address, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol.ETH, isUniswapReversed: true},
+        // {cToken: cToken.USDT, underlying: deployed[totalErc20StubsToDeploy.indexOf('USDT')].address, symbolHash: keccak256('USDT'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
+        // {cToken: cToken.USDC, underlying: deployed[totalErc20StubsToDeploy.indexOf('USDC')].address, symbolHash: keccak256('USDC'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
       ];
 
       withPairKeys.forEach(pairSymbol => {
+        if(!pairBySymbol[pairSymbol]) {
+          return;
+        }
         custom.push(
-          {cToken: cToken[pairSymbol], underlying: deployed[totalErc20StubsToDeploy.indexOf(pairSymbol)].address, symbolHash: keccak256(pairSymbol), baseUnit: uint(1e18), priceSource: PriceSource.FIXED_USD, fixedPrice: 0, uniswapMarket: uniswapPairs.withPair[pairSymbol].pair, isUniswapReversed: false},
+          {cToken: cToken[pairSymbol], underlying: deployed[totalErc20StubsToDeploy.indexOf(pairSymbol)].address, symbolHash: keccak256(pairSymbol), baseUnit: uint(1e18), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol[pairSymbol], isUniswapReversed: false},
         )
       });
+      return custom;
       // console.log('custom>', custom);
     }
     await getTokenConfigs();
 
-    return;
-
     console.log('>>> Deploying CVP token...');
-    const cvpToken = await MockCVP.new(ether(2e9));
+    const cvpToken = networkId === 42 ? await MockCVP.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2') : await MockCVP.new(deployer);
     console.log('>>> CVP Token deployed at', cvpToken.address);
 
     console.log('>>> Deploying PowerOracleStaking...');
     const staking = await deployProxied(
       PowerOracleStaking,
       [cvpToken.address],
-      [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
+      [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, '1'],
       { proxyAdminOwner: OWNER }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
@@ -170,7 +179,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     await cvpToken.approve(oracle.address, 10000);
 
     console.log('>>> Making the initial poke');
-    await oracle.poke(['ETH', 'DAI', 'REP', 'BTC', 'CVP']);
+    await oracle.poke(withPairKeys.filter(s => pairBySymbol[s]));
 
     console.log('Done');
   });

@@ -79,6 +79,7 @@
   },
   "dependencies": {
     "@nomiclabs/buidler-ethers": "^2.0.0",
-    "bignumber.js": "^9.0.1"
+    "bignumber.js": "^9.0.1",
+    "p-iteration": "^1.1.8"
   }
 }
