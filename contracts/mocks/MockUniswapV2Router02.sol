@@ -259,20 +259,14 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         uint amountBMin
     ) internal virtual returns (uint amountA, uint amountB) {
         // create the pair if it doesn't exist yet
-        console.log("hey-2");
         if (IUniswapV2Factory(factory).getPair(tokenA, tokenB) == address(0)) {
             IUniswapV2Factory(factory).createPair(tokenA, tokenB);
         }
-console.log("hey-3", factory);
-(uint reserveA, uint reserveB) = UniswapV2Library.getReserves(factory, tokenA, tokenB);
-console.log("hey-4");
+        (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(factory, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
-console.log("hey-5");
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
-console.log("hey-5");
             uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
-console.log("hey-7");
             if (amountBOptimal <= amountBDesired) {
                 require(amountBOptimal >= amountBMin, 'UniswapV2Router: INSUFFICIENT_B_AMOUNT');
                 (amountA, amountB) = (amountADesired, amountBOptimal);
@@ -294,9 +288,7 @@ console.log("hey-7");
         address to,
         uint deadline
     ) external virtual override ensure(deadline) returns (uint amountA, uint amountB, uint liquidity) {
-        console.log("hey-1");
         (amountA, amountB) = _addLiquidity(tokenA, tokenB, amountADesired, amountBDesired, amountAMin, amountBMin);
-        console.log("hey-10");
         address pair = UniswapV2Library.pairFor(factory, tokenA, tokenB);
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, amountA);
         TransferHelper.safeTransferFrom(tokenB, msg.sender, pair, amountB);

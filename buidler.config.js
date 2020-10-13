@@ -37,6 +37,7 @@ const config = {
     },
     kovan: {
       url: 'https://kovan-eth.compound.finance',
+      gasPrice: 1000000000,
       accounts: ['YOUR_PRIVATE_KEY_HERE']
     },
     coverage: {

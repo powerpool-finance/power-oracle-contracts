@@ -37,7 +37,8 @@
     "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.9",
-    "typechain": "^2.0.0"
+    "typechain": "^2.0.0",
+    "p-iteration": "^1.1.8"
   },
   "files": [
     "/contracts"
