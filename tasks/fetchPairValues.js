@@ -8,12 +8,12 @@ task('pair-details', "Prints an account's balance")
     MockUniswapTokenPair.numberFormat = 'String';
 
     const uniswapPairs = require('../config/uniswapPairs');
-    const pairKeys = Object.keys(uniswapPairs);
+    const pairKeys = Object.keys(uniswapPairs.withPair);
 
     const result = {};
     for (const k of pairKeys) {
       console.log('>>> Fetching', k, '...');
-      const pair = await MockUniswapTokenPair.at(uniswapPairs[k].pair);
+      const pair = await MockUniswapTokenPair.at(uniswapPairs.withPair[k].pair);
       const res = await pair.getReserves();
       result[k] = {
         reserve0: res.reserve0,
