@@ -19,7 +19,6 @@ contract UniswapConfig {
     ///  There should be 1 TokenConfig object for each supported asset, passed in the constructor.
     struct TokenConfig {
         address cToken;
-        // TODO: get rid of underlying
         address underlying;
         bytes32 symbolHash;
         uint256 baseUnit;
@@ -31,7 +30,7 @@ contract UniswapConfig {
 
     /// @notice The max number of tokens this contract is hardcoded to support
     /// @dev Do not change this variable without updating all the fields throughout the contract.
-    uint public constant maxTokens = 10;
+    uint public constant maxTokens = 15;
 
     /// @notice The number of tokens this contract actually supports
     uint public immutable numTokens;
@@ -667,7 +666,7 @@ contract UniswapConfig {
      * @return The config object
      */
     function getTokenConfig(uint i) public view returns (TokenConfig memory) {
-        require(i < numTokens, "token config not found");
+        require(i < numTokens, "UniswapConfig::getTokenConfig: Token config not found");
 
         if (i == 0) return TokenConfig({cToken: cToken00, underlying: underlying00, symbolHash: symbolHash00, baseUnit: baseUnit00, priceSource: priceSource00, fixedPrice: fixedPrice00, uniswapMarket: uniswapMarket00, isUniswapReversed: isUniswapReversed00});
         if (i == 1) return TokenConfig({cToken: cToken01, underlying: underlying01, symbolHash: symbolHash01, baseUnit: baseUnit01, priceSource: priceSource01, fixedPrice: fixedPrice01, uniswapMarket: uniswapMarket01, isUniswapReversed: isUniswapReversed01});
@@ -723,7 +722,7 @@ contract UniswapConfig {
             return getTokenConfig(index);
         }
 
-        revert("token config not found");
+        revert("UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found");
     }
 
     /**
@@ -752,6 +751,6 @@ contract UniswapConfig {
             return getTokenConfig(index);
         }
 
-        revert("token config not found");
+      revert("UniswapConfig::getTokenConfigByUnderlying: Token cfg not found");
     }
 }

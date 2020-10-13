@@ -1,17 +1,27 @@
-// const MockUniswapTokenPair =
+const fs = require('fs');
+
 usePlugin('@nomiclabs/buidler-truffle5');
 
 task('pair-details', "Prints an account's balance")
-  .addParam('account', "The account's address")
   .setAction(async (taskArgs) => {
     const MockUniswapTokenPair = artifacts.require('MockUniswapTokenPair');
     MockUniswapTokenPair.numberFormat = 'String';
 
-    const pair = await MockUniswapTokenPair.at(taskArgs.account);
+    const uniswapPairs = require('../config/uniswapPairs');
+    const pairKeys = Object.keys(uniswapPairs);
 
-    // NOTICE: roughly values, but ok for seeding test suite
-    console.log('price0CumulativeLast', await pair.price0CumulativeLast());
-    console.log('price1CumulativeLast', await pair.price1CumulativeLast());
+    const result = {};
+    for (const k of pairKeys) {
+      console.log('>>> Fetching', k, '...');
+      const pair = await MockUniswapTokenPair.at(uniswapPairs[k].pair);
+      const res = await pair.getReserves();
+      result[k] = {
+        reserve0: res.reserve0,
+        reserve1: res.reserve1,
+        blockTimestampLast: res.blockTimestampLast,
+      }
+    }
+    fs.writeFileSync('./tmp/pairValues.json', JSON.stringify(result, null, 2));
   });
 
 module.exports = {};

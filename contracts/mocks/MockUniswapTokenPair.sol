@@ -38,7 +38,7 @@ contract MockUniswapTokenPair {
     price1CumulativeLast = price1CumulativeLast_;
   }
 
-  function getReserves() external view returns(uint112, uint112, uint32) {
+  function getReserves() external view returns(uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast) {
     return (reserve0, reserve1, blockTimestampLast);
   }
 
