@@ -35,11 +35,14 @@ interface IPowerOracle {
 
   /*** Viewers ***/
   /// Get price by a token address
-  function getPriceByAddress(address token) external view returns (uint256);
+  function getPriceByAsset(address token) external view returns (uint256);
 
   /// Get price by a token symbol, like "USDC"
   function getPriceBySymbol(string calldata symbol) external view returns (uint256);
 
   /// Get price by a token symbol hash, like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
-  function getPriceByHash(bytes32 symbolHash) external view returns (uint256);
+  function getPriceBySymbolHash(bytes32 symbolHash) external view returns (uint256);
+
+  /// Get the underlying price of a cToken
+  function getUnderlyingPrice(address cToken) external view returns (uint);
 }

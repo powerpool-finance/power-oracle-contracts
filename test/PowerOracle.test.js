@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
+const { address, ether, mwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -19,6 +19,7 @@ MockOracle.numberFormat = 'String';
 const DAI_SYMBOL_HASH = keccak256('DAI');
 const ETH_SYMBOL_HASH = keccak256('ETH');
 const CVP_SYMBOL_HASH = keccak256('CVP');
+const USDT_SYMBOL_HASH = keccak256('USDT');
 const REPORT_REWARD_IN_ETH = ether('0.05');
 const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = '45';
@@ -484,4 +485,41 @@ describe('PowerOracle', function () {
       });
     });
   });
+
+  describe('viewers', () => {
+    // Token configs are stored with static addresses, with no relation to the cvpToken in this file
+    const CFG_CVP_ADDRESS = address(777);
+    const CFG_USDT_ADDRESS = address(444);
+    const CFG_ETH_ADDRESS = address(111);
+    const CFG_CVP_CTOKEN_ADDRESS = address(7);
+    const CFG_USDT_CTOKEN_ADDRESS = address(4);
+    const CFG_ETH_CTOKEN_ADDRESS = address(1);
+
+    it('should respond with a correct values for a reported price', async function() {
+      await oracle.mockSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_CVP_ADDRESS)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
+      expect(await oracle.getUnderlyingPrice(CFG_CVP_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+    });
+
+    it('should respond with a correct values for FIXED_USD price', async function() {
+      await oracle.mockSetPrice(USDT_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
+      expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
+      expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
+      expect(await oracle.getUnderlyingPrice(CFG_USDT_CTOKEN_ADDRESS)).to.be.equal(tether('1'));
+    });
+
+    it('should respond with a correct values for FIXED_ETH price', async function() {
+      await oracle.mockSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
+      expect(await oracle.getUnderlyingPrice(CFG_ETH_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+    });
+  })
 });

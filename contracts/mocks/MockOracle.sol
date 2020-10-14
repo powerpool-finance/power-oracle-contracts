@@ -19,6 +19,10 @@ contract MockOracle is PowerOracle {
     rewards[userId_] = reward_;
   }
 
+  function mockSetPrice(bytes32 symbolHash_, uint128 value_) external {
+    prices[symbolHash_] = Price(uint128(block.timestamp), value_);
+  }
+
   event MockRewardAddress(address to, uint256 count);
   function rewardAddress(address to_, uint256 count_) public override(PowerOracle) {
     emit MockRewardAddress(to_, count_);
