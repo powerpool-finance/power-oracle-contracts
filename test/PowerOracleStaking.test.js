@@ -20,14 +20,20 @@ const SLASHER_SLASHING_REWARD_PCT = ether(5);
 const PROTOCOL_SLASHING_REWARD_PCT = ether('1.5');
 const SET_USER_REWARD_COUNT = 3;
 
+const USER_STATUS = {
+  UNAUTHORIZED: '0',
+  CAN_REPORT: '1',
+  CAN_SLASH: '2'
+};
+
 describe('PowerOracleStaking', function () {
   let staking;
   let cvpToken;
 
-  let deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink, reservoir;
+  let deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, charliePoker, sink, reservoir;
 
   before(async function() {
-    [deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink, reservoir] = await web3.eth.getAccounts();
+    [deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, charliePoker, sink, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -471,4 +477,70 @@ describe('PowerOracleStaking', function () {
         .to.be.revertedWith('PowerOracleStaking::slash: Only PowerOracle allowed');
     });
   })
+
+  describe('viewers', () => {
+    beforeEach(async function() {
+      await staking.setMinimalSlashingDeposit(ether(50), { from: owner });
+      await staking.stubSetReporter(3, ether(50));
+
+      // it's ok to use the same keys for different users
+      await staking.stubSetUser(1, alice, alicePoker, aliceFinancier, ether(30));
+      await staking.stubSetUser(2, bob, bobPoker, bobFinancier, ether(50));
+      await staking.stubSetUser(3, charlie, charliePoker, charlie, ether(100));
+    });
+
+    describe('getUserStatus', () => {
+      it('should respond with UNAUTHORIZED if there is not enough deposit', async function() {
+        expect(await staking.getUserStatus(1, alicePoker)).to.be.equal(USER_STATUS.UNAUTHORIZED);
+      });
+
+      it('should respond with UNAUTHORIZED if there is no match between a poker key and a user id', async function() {
+        expect(await staking.getUserStatus(2, alicePoker)).to.be.equal(USER_STATUS.UNAUTHORIZED);
+      });
+
+      it('should respond with CAN_SLASH if there is enough deposit, but not a reporter', async function() {
+        expect(await staking.getUserStatus(2, bobPoker)).to.be.equal(USER_STATUS.CAN_SLASH);
+      });
+
+      it('should respond with CAN_REPORT if there is enough deposit and is a reporter', async function() {
+        expect(await staking.getUserStatus(3, charliePoker)).to.be.equal(USER_STATUS.CAN_REPORT);
+      });
+
+      it('should respond with UNAUTHORIZED if there is no match between a reporter and a user id', async function() {
+        expect(await staking.getUserStatus(3, alicePoker)).to.be.equal(USER_STATUS.UNAUTHORIZED);
+      });
+    })
+
+    describe('authorizeReporter', () => {
+      it('should authorize a valid reporter', async function() {
+        await staking.authorizeReporter(3, charliePoker);
+      });
+
+      it('should not authorize an invalid reporter', async function() {
+        await expect(staking.authorizeReporter(2, bobPoker))
+          .to.be.revertedWith(' PowerOracleStaking::authorizeReporter: Invalid reporter');
+      });
+
+      it('should not authorize a valid reporter with an invalid poker key', async function() {
+        await expect(staking.authorizeReporter(3, bobPoker))
+          .to.be.revertedWith(' PowerOracleStaking::authorizeReporter: Invalid poker key');
+      });
+    })
+
+    describe('authorizeSlasher', () => {
+      it('should authorize a valid slasher', async function() {
+        await staking.authorizeSlasher(2, bobPoker);
+      });
+
+      it('should not authorize an insufficient deposit', async function() {
+        await expect(staking.authorizeSlasher(1, alicePoker))
+          .to.be.revertedWith(' PowerOracleStaking::authorizeSlasher: Insufficient deposit');
+      });
+
+      it('should not authorize a valid slasher with an invalid poker key', async function() {
+        await expect(staking.authorizeSlasher(2, alicePoker))
+          .to.be.revertedWith(' PowerOracleStaking::authorizeSlasher: Invalid poker key');
+      });
+    })
+  });
 });
