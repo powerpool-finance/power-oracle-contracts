@@ -77,6 +77,14 @@ function ether(value) {
   return etherBN(String(value)).toString();
 }
 
+function tether(value) {
+  return web3.utils.toWei(value, 'tether').toString();
+}
+
+function mwei(value) {
+  return web3.utils.toWei(value, 'mwei').toString();
+}
+
 /**
  * Finds a first event/arg occurrence and returns a value
  * @param {object} receipt
@@ -191,6 +199,8 @@ module.exports = {
   createOrGetProxyAdmin,
   deployProxied,
   ether,
+  mwei,
+  tether,
   getEventArg,
   splitCalldata,
   fetchLogs,

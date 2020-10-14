@@ -61,12 +61,6 @@ interface IPowerOracleStaking {
 
   function authorizeSlasher(uint256 userId_, address reporterKey_) external view;
 
-  /// Check whether the reporter key belongs to the userId
-  function isValidReporterKey(uint256 userId_, address reporter_) external view returns (bool);
-
-  /// Check whether the reporter key belongs to the userId
-  function requireValidReporterKey(uint256 userId_, address reporter_) external view;
-
   /// Check whether the financier key belongs to the userId
   function requireValidFinancierKey(uint256 userId_, address financier_) external view;
 }

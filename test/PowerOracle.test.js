@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
+const { address, ether, mwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -19,6 +19,7 @@ MockOracle.numberFormat = 'String';
 const DAI_SYMBOL_HASH = keccak256('DAI');
 const ETH_SYMBOL_HASH = keccak256('ETH');
 const CVP_SYMBOL_HASH = keccak256('CVP');
+const USDT_SYMBOL_HASH = keccak256('USDT');
 const REPORT_REWARD_IN_ETH = ether('0.05');
 const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = '45';
@@ -55,7 +56,7 @@ describe('PowerOracle', function () {
 
   beforeEach(async function() {
     cvpToken = await MockCVP.new(ether(100000));
-    staking = await MockStaking.new(cvpToken.address);
+    staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
       MockOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
@@ -82,7 +83,7 @@ describe('PowerOracle', function () {
 
   describe('pokeFromReporter', () => {
     beforeEach(async () => {
-      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
       await staking.mockSetReporter(1, ether(300));
     });
 
@@ -108,6 +109,12 @@ describe('PowerOracle', function () {
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker }))
+        .to.be.revertedWith('Pausable: paused');
     });
 
     describe('rewards', () => {
@@ -262,9 +269,9 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
-      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
       await staking.mockSetReporter(1, ether(300));
-      await staking.setUser(2, alice, validSlasherPoker, alice, ether(100));
+      await staking.mockSetUser(2, alice, validSlasherPoker, alice, ether(100));
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
@@ -286,8 +293,7 @@ describe('PowerOracle', function () {
         newTimestamp: secondTimestamp
       })
 
-      const logs = await fetchLogs(MockStaking, res);
-      expectEvent({ logs }, 'MockSlash', {
+      expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
         overdueCount: '4'
       });
@@ -316,10 +322,9 @@ describe('PowerOracle', function () {
         tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
         oldTimestamp: firstTimestamp,
         newTimestamp: secondTimestamp
-      })
+      });
 
-      const logs = await fetchLogs(MockStaking, res);
-      expectEvent({ logs }, 'MockSlash', {
+      expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
         overdueCount: '2'
       });
@@ -364,6 +369,12 @@ describe('PowerOracle', function () {
       await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasherPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
+
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.pokeFromReporter(2, ['REP'], { from: validSlasherPoker }))
+        .to.be.revertedWith('Pausable: paused');
+    });
   });
 
   describe('poke (permissionless)', () => {
@@ -406,13 +417,19 @@ describe('PowerOracle', function () {
       await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
+
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.poke(['REP'], { from: bob }))
+        .to.be.revertedWith('Pausable: paused');
+    });
   });
 
   describe('withdrawing rewards', async function() {
     const USER_ID = 4;
     beforeEach(async () => {
-      await oracle.setUserReward(USER_ID, ether(250));
-      await staking.setUserFinancier(USER_ID, aliceFinancier)
+      await oracle.mockSetUserReward(USER_ID, ether(250));
+      await staking.mockSetUserFinancier(USER_ID, aliceFinancier)
     })
 
     it('should allow a valid user withdrawing their rewards', async function() {
@@ -485,5 +502,72 @@ describe('PowerOracle', function () {
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
+
+    describe('pause', () => {
+      it('should allow the owner pausing the contract', async function() {
+        expect(await oracle.paused()).to.be.false;
+        await oracle.pause({ from: owner });
+        expect(await oracle.paused()).to.be.true;
+      });
+
+      it('should deny non-owner pausing the contract', async function() {
+        await expect(oracle.pause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
+
+    describe('unpause', () => {
+      beforeEach(async function() {
+        await oracle.pause({ from: owner });
+      });
+
+      it('should allow the owner unpausing the contract', async function() {
+        expect(await oracle.paused()).to.be.true;
+        await oracle.unpause({ from: owner });
+        expect(await oracle.paused()).to.be.false;
+      });
+
+      it('should deny non-owner unpausing the contract', async function() {
+        await expect(oracle.unpause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
   });
+
+  describe('viewers', () => {
+    // Token configs are stored with static addresses, with no relation to the cvpToken in this file
+    const CFG_CVP_ADDRESS = address(777);
+    const CFG_USDT_ADDRESS = address(444);
+    const CFG_ETH_ADDRESS = address(111);
+    const CFG_CVP_CTOKEN_ADDRESS = address(7);
+    const CFG_USDT_CTOKEN_ADDRESS = address(4);
+    const CFG_ETH_CTOKEN_ADDRESS = address(1);
+
+    it('should respond with a correct values for a reported price', async function() {
+      await oracle.mockSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_CVP_ADDRESS)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
+      expect(await oracle.getUnderlyingPrice(CFG_CVP_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+    });
+
+    it('should respond with a correct values for FIXED_USD price', async function() {
+      await oracle.mockSetPrice(USDT_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
+      expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
+      expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
+      expect(await oracle.getUnderlyingPrice(CFG_USDT_CTOKEN_ADDRESS)).to.be.equal(tether('1'));
+    });
+
+    it('should respond with a correct values for FIXED_ETH price', async function() {
+      await oracle.mockSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
+
+      expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
+      expect(await oracle.getUnderlyingPrice(CFG_ETH_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+    });
+  })
 });

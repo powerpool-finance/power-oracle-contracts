@@ -44,10 +44,9 @@ describe('IntegrationTest', function () {
   });
 
   it('should allow stake, poke and slash', async function() {
-    // TODO: deploy both contracts and wrap them with proxy
     staking = await deployProxied(
       PowerOracleStaking,
-      [cvpToken.address],
+      [cvpToken.address, reservoir],
       [owner, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, SET_USER_REWARD_COUNT],
       { proxyAdminOwner: owner }
       );
@@ -169,6 +168,7 @@ describe('IntegrationTest', function () {
       tokenCount: '3',
       overdueCount: '3'
     })
+    expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(40));
 
     // Withdrawing rewards
     expect(await cvpToken.balanceOf(alice)).to.be.equal('0');
@@ -180,21 +180,18 @@ describe('IntegrationTest', function () {
     await cvpToken.transfer(reservoir, 4820, { from: alice });
     // Withdraw stake
     expect(await cvpToken.balanceOf(alice)).to.be.equal('0');
-    await expect(staking.withdraw(aliceId, alice, ether(101), { from: aliceFinancier }))
+    await expect(staking.withdraw(aliceId, alice, ether(41), { from: aliceFinancier }))
       .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
-    await staking.withdraw(aliceId, alicePoker, ether(100), { from: aliceFinancier });
-    expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(100));
+    await staking.withdraw(aliceId, alicePoker, ether(40), { from: aliceFinancier });
+    expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(40));
 
-    expect(await staking.getDepositOf(aliceId)).to.be.equal('0');
     expect(await oracle.rewards(aliceId)).to.be.equal('0');
+    expect(await staking.getDepositOf(aliceId)).to.be.equal('0');
+    expect(await staking.getDepositOf(bobId)).to.be.equal(ether(95));
+    expect(await staking.getDepositOf(charlieId)).to.be.equal(ether(30));
 
-    // Assign a new reporter
-    await staking.setReporter(charlieId, { from: reservoir });
-    await staking.setReporter(bobId, { from: reservoir });
-    await expect(staking.setReporter(charlieId, { from: reservoir }))
-      .to.be.revertedWith('PowerOracleStaking::setReporter: Insufficient candidate deposit');
 
     expect(await staking.getReporterId()).to.be.equal(bobId);
-    expect(await staking.getHighestDeposit()).to.be.equal(ether(50));
+    expect(await staking.getHighestDeposit()).to.be.equal(ether(95));
   });
 });

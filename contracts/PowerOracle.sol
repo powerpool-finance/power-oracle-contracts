@@ -11,9 +11,10 @@ import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./UniswapTWAPProvider.sol";
 import "./interfaces/IPowerOracleStaking.sol";
+import "./utils/Pausable.sol";
 
 
-contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvider {
+contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
 
   uint256 public constant REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT = 100;
@@ -100,7 +101,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     return cvpPrice;
   }
 
-  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external {
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::pokeFromReporter: Missing token symbols");
 
@@ -121,7 +122,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     _rewardUser(reporterId_, rewardCount, ethPrice, cvpPrice);
   }
 
-  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external {
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::pokeFromSlasher: Missing token symbols");
 
@@ -143,7 +144,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     }
   }
 
-  function poke(string[] memory symbols_) public {
+  function poke(string[] memory symbols_) public whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::poke: Missing token symbols");
 
@@ -276,17 +277,29 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     emit SetPowerOracleStaking(powerOracleStaking_);
   }
 
+  function pause() external override onlyOwner {
+    _pause();
+  }
+
+  function unpause() external override onlyOwner {
+    _unpause();
+  }
+
   /*** Viewers ***/
 
-  /// Get price by a token address
-  function getPriceByAddress(address token_) external view override returns (uint256) {
+  /**
+   * @notice Get the underlying price of a token
+   * @param token_ The token address for price retrieval
+   * @return Price denominated in USD, with 6 decimals, for the given asset address
+   */
+  function getPriceByAsset(address token_) external view override returns (uint) {
     TokenConfig memory config = getTokenConfigByUnderlying(token_);
     return priceInternal(config);
   }
 
   /**
    * @notice Get the official price for a symbol, like "COMP"
-   * @param symbol_ The symbol to fetch the price of
+   * @param symbol_ The symbol for price retrieval
    * @return Price denominated in USD, with 6 decimals
    */
   function getPriceBySymbol(string calldata symbol_) external view override returns (uint256) {
@@ -294,19 +307,25 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     return priceInternal(config);
   }
 
-  /// Get price by a token symbol hash, like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
-  function getPriceByHash(bytes32 symbolHash_) external view override returns (uint256) {
+  /**
+   * @notice Get price by a token symbol hash,
+   *    like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
+   * @param symbolHash_ The symbol hash for price retrieval
+   * @return Price denominated in USD, with 6 decimals, for the given asset address
+   */
+  function getPriceBySymbolHash(bytes32 symbolHash_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash_);
     return priceInternal(config);
   }
 
   /**
-   * @notice Get the underlying price of a token
-   * @param token_ The token address for price retrieval
+   * @notice Get the underlying price of a cToken
+   * @dev Implements the PriceOracle interface for Compound v2.
+   * @param cToken_ The cToken address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given cToken address
    */
-  function getTokenPrice(address token_) external view returns (uint) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token_);
+  function getUnderlyingPrice(address cToken_) external view override returns (uint) {
+    TokenConfig memory config = getTokenConfigByCToken(cToken_);
     // Comptroller needs prices in the format: ${raw price} * 1e(36 - baseUnit)
     // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
     return mul(1e30, priceInternal(config)) / config.baseUnit;
