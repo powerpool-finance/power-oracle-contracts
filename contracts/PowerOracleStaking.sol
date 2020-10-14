@@ -3,6 +3,7 @@
 pragma solidity ^0.6.12;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
+import "@nomiclabs/buidler/console.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./utils/Ownable.sol";
@@ -23,7 +24,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   event SetSlashingPct(uint256 slasherSlashingRewardPct, uint256 protocolSlashingRewardPct);
   event SetPowerOracle(address powerOracle);
   event SetReporter(uint256 indexed reporterId, address indexed msgSender);
-  event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 slasherReward, uint256 reservoirReward);
+  event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 indexed overdueCount, uint256 slasherReward, uint256 reservoirReward);
   event ReporterChange(
     uint256 indexed prevId,
     uint256 indexed nextId,
@@ -40,6 +41,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   }
 
   IERC20 public immutable cvpToken;
+  address public immutable reservoir;
   address public powerOracle;
 
   uint256 public totalDeposit;
@@ -55,8 +57,9 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
 
   mapping(uint256 => User) public users;
 
-  constructor(address cvpToken_) public {
+  constructor(address cvpToken_, address reservoir_) public {
     cvpToken = IERC20(cvpToken_);
+    reservoir = reservoir_;
   }
 
   function initialize(
@@ -91,17 +94,22 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     user.deposit = depositAfter;
     totalDeposit = totalDeposit.add(amount_);
 
-    uint256 highestDeposit = _highestDeposit;
-    uint256 prevReporterId = _reporterId;
-    if (depositAfter > highestDeposit && prevReporterId != userId_) {
-      _highestDeposit = depositAfter;
-      _reporterId = userId_;
-
-      emit ReporterChange(prevReporterId, userId_, highestDeposit, users[prevReporterId].deposit, depositAfter);
-    }
+    _trySetReporter(userId_, depositAfter);
 
     emit Deposit(userId_, msg.sender, amount_, depositAfter);
     cvpToken.transferFrom(msg.sender, address(this), amount_);
+  }
+
+  function _trySetReporter(uint256 candidateId_, uint256 candidateDepositAfter_) internal {
+    uint256 prevReporterId = _reporterId;
+    uint256 prevDeposit = users[prevReporterId].deposit;
+
+    if (candidateDepositAfter_ > prevDeposit && prevReporterId != candidateId_) {
+      emit ReporterChange(prevReporterId, candidateId_, _highestDeposit, users[prevReporterId].deposit, candidateDepositAfter_);
+
+      _highestDeposit = candidateDepositAfter_;
+      _reporterId = candidateId_;
+    }
   }
 
   function withdraw(uint256 userId_, address to_, uint256 amount_) external override {
@@ -159,15 +167,32 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   function slash(uint256 slasherId_, uint256 overdueCount_) external override virtual {
     User storage slasher = users[slasherId_];
     require(slasher.deposit >= minimalSlashingDeposit, "PowerOracleStaking::slash: Insufficient slasher deposit");
+    require(msg.sender == powerOracle, "PowerOracleStaking::slash: Only PowerOracle allowed");
 
-    uint256 reporterDeposit = users[_reporterId].deposit;
+    uint256 reporterId = _reporterId;
+    uint256 reporterDeposit = users[reporterId].deposit;
 
-    // uint256 slasherReward = reporterDeposit * slasherRewardPct / HUNDRED_PCT;
-    uint256 slasherReward = reporterDeposit.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
-    // uint256 reservoirReward = reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
-    uint256 reservoirReward = reporterDeposit.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
+    uint256 product = overdueCount_.mul(reporterDeposit);
+    // uint256 slasherReward = overdueCount_ * reporterDeposit * slasherRewardPct / HUNDRED_PCT;
+    uint256 slasherReward = product.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
+    // uint256 reservoirReward = overdueCount_ * reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
+    uint256 reservoirReward = product.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
 
-    emit Slash(slasherId_, _reporterId, slasherReward, reservoirReward);
+    // users[reporterId].deposit = reporterDeposit - slasherReward - reservoirReward;
+    users[reporterId].deposit = reporterDeposit.sub(slasherReward).sub(reservoirReward);
+
+    if (slasherReward > 0) {
+      // uint256 slasherDepositAfter = users[slasherId_].deposit + slasherReward
+      uint256 slasherDepositAfter = users[slasherId_].deposit.add(slasherReward);
+      users[slasherId_].deposit = slasherDepositAfter;
+      _trySetReporter(slasherId_, slasherDepositAfter);
+    }
+
+    if (reservoirReward > 0) {
+      cvpToken.transfer(reservoir, reservoirReward);
+    }
+
+    emit Slash(slasherId_, reporterId, overdueCount_, slasherReward, reservoirReward);
   }
 
   /*** Owner Interface ***/

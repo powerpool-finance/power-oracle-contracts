@@ -6,8 +6,11 @@ import "../PowerOracleStaking.sol";
 
 
 contract MockStaking is PowerOracleStaking {
-  constructor(address cvpToken_) public PowerOracleStaking(cvpToken_) {
+  constructor(address cvpToken_, address reservoir_) public PowerOracleStaking(cvpToken_, reservoir_) {
+  }
 
+  function mockSetTotalDeposit(uint256 totalDeposit_) external {
+    totalDeposit = totalDeposit_;
   }
 
   event MockSlash(uint256 userId, uint256 overdueCount);
@@ -16,27 +19,23 @@ contract MockStaking is PowerOracleStaking {
     emit MockSlash(slasherId_, overdueCount_);
   }
 
-  function setTotalDeposit(uint256 totalDeposit_) external {
-    totalDeposit = totalDeposit_;
-  }
-
   function mockSetReporter(uint256 userId_, uint256 highestDeposit_) external {
     _reporterId = userId_;
     _highestDeposit = highestDeposit_;
   }
 
-  function setUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_, uint256 deposit_) external {
+  function mockSetUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_, uint256 deposit_) external {
     users[userId_].adminKey = adminKey_;
     users[userId_].pokerKey = pokerKey_;
     users[userId_].financierKey = financierKey_;
     users[userId_].deposit = deposit_;
   }
 
-  function setUserFinancier(uint256 userId_, address financierKey_) external {
+  function mockSetUserFinancier(uint256 userId_, address financierKey_) external {
     users[userId_].financierKey = financierKey_;
   }
 
-  function setUserDeposit(uint256 userId_, uint256 deposit_) external {
+  function mockSetUserDeposit(uint256 userId_, uint256 deposit_) external {
     users[userId_].deposit = deposit_;
   }
 }

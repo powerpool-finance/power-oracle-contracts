@@ -7,34 +7,34 @@ const { solidity } = require('ethereum-waffle');
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
 const MockOracle = artifacts.require('MockOracle');
-const MockStaking = artifacts.require('MockStaking');
+const StubStaking = artifacts.require('StubStaking');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
-MockStaking.numberFormat = 'String';
+StubStaking.numberFormat = 'String';
 
 const MINIMAL_SLASHING_DEPOSIT = ether(50);
-const SLASHER_SLASHING_REWARD_PCT = ether(15);
-const PROTOCOL_SLASHING_REWARD_PCT = ether(5);
+const SLASHER_SLASHING_REWARD_PCT = ether(5);
+const PROTOCOL_SLASHING_REWARD_PCT = ether('1.5');
 const SET_USER_REWARD_COUNT = 3;
 
 describe('PowerOracleStaking', function () {
   let staking;
   let cvpToken;
 
-  let deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink;
+  let deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink, reservoir;
 
   before(async function() {
-    [deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink] = await web3.eth.getAccounts();
+    [deployer, owner, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, sink, reservoir] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
-    cvpToken = await MockCVP.new(ether(2000));
+    cvpToken = await MockCVP.new(ether(1e9));
     staking = await deployProxied(
-      MockStaking,
-      [cvpToken.address],
+      StubStaking,
+      [cvpToken.address, reservoir],
       [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT],
       { proxyAdminOwner: owner }
     );
@@ -208,8 +208,8 @@ describe('PowerOracleStaking', function () {
       const USER_ID = 42;
 
       beforeEach(async () => {
-        await staking.setUser(USER_ID, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
-        await staking.setTotalDeposit(ether(100));
+        await staking.stubSetUser(USER_ID, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+        await staking.stubSetTotalDeposit(ether(100));
         await cvpToken.transfer(staking.address, ether(500), { from: deployer });
       });
 
@@ -264,7 +264,7 @@ describe('PowerOracleStaking', function () {
   describe('owner interface', () => {
     describe('withdrawExtraCvp', () => {
       it('should allow the owner withdrawing accidentally sent CVPs from the contract', async function() {
-        await staking.setTotalDeposit(ether(100));
+        await staking.stubSetTotalDeposit(ether(100));
         await cvpToken.transfer(staking.address, ether(120), { from: deployer });
 
         expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
@@ -281,7 +281,7 @@ describe('PowerOracleStaking', function () {
       });
 
       it('should not withdraw if there is no diff in accounted tokens', async function() {
-        await staking.setTotalDeposit(ether(100));
+        await staking.stubSetTotalDeposit(ether(100));
         await cvpToken.transfer(staking.address, ether(100), { from: deployer });
 
         expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
@@ -358,10 +358,10 @@ describe('PowerOracleStaking', function () {
     });
 
     it('should allow setting reporter if there is another user with a higher deposit', async function() {
-      await staking.setUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
-      await staking.setUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
+      await staking.stubSetUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.stubSetUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
 
-      await staking.mockSetReporter(1, ether(300));
+      await staking.stubSetReporter(1, ether(300));
       expect(await staking.getReporterId()).to.be.equal('1');
       expect(await staking.getHighestDeposit()).to.be.equal(ether(300));
 
@@ -371,10 +371,10 @@ describe('PowerOracleStaking', function () {
     });
 
     it('should reward a setter', async function() {
-      await staking.setUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
-      await staking.setUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
+      await staking.stubSetUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.stubSetUser(2, bob, bobPoker, bobFinancier, ether(200), { from: bob });
 
-      await staking.mockSetReporter(1, ether(300));
+      await staking.stubSetReporter(1, ether(300));
 
       expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
       const res = await staking.setReporter(2, { from: charlie });
@@ -396,4 +396,79 @@ describe('PowerOracleStaking', function () {
       expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
     });
   });
+
+  describe('slash', () => {
+    const SLASHER_ID = '42';
+    const REPORTER_ID = '5';
+
+    beforeEach(async function() {
+      await cvpToken.transfer(staking.address, ether(10000), { from: deployer });
+      // await cvpToken.approve(staking.address, ether(10000), { from: reservoir });
+
+      await staking.stubSetUser(REPORTER_ID, alice, alicePoker, aliceFinancier, ether(500), { from: bob });
+      await staking.stubSetUser(SLASHER_ID, bob, bobPoker, bobFinancier, ether(60), { from: bob });
+      await staking.stubSetReporter(REPORTER_ID, ether(600), { from: bob });
+    });
+
+    it('should allow a powerOracle slashing current reporter', async function() {
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal('0');
+
+      const res = await staking.slash(SLASHER_ID, 4, { from: powerOracle });
+
+      // 500 - 100 - 30 = 370
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(370));
+      // 100 + 100 = 200
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(160));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal(ether(30));
+
+      expect(await staking.getReporterId()).to.be.equal(REPORTER_ID);
+
+      expectEvent(res, 'Slash', {
+        slasherId: '42',
+        reporterId: '5',
+        // 500 * 5% * 4 = 25 * 4 = 100
+        slasherReward: ether(100),
+        // 500 * 1.5% * 4 = 7.5 * 4 = 30
+        reservoirReward: ether(30)
+      })
+    });
+
+    it('should change the reporterId to the slasher the reporters deposit becomes lesser', async function() {
+      await staking.slash(SLASHER_ID, 4, { from: powerOracle });
+
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(370));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(160));
+
+      await staking.slash(SLASHER_ID, 4, { from: powerOracle });
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(273.8));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(234));
+
+      const res = await staking.slash(SLASHER_ID, 4, { from: powerOracle });
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether('202.612'));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether('288.76'));
+
+      expect(await staking.getReporterId()).to.be.equal(SLASHER_ID);
+
+      expectEvent(res, 'ReporterChange', {
+        prevId: REPORTER_ID,
+        nextId: SLASHER_ID,
+        highestDepositPrev: ether(600),
+        actualDepositPrev: ether('202.612'),
+        actualDepositNext: ether('288.76')
+      })
+    });
+
+    it('should deny slashing if the slasher deposit is not sufficient', async function() {
+      await staking.stubSetUser(SLASHER_ID, bob, bobPoker, bobFinancier, ether(40), { from: bob });
+      await expect(staking.slash(SLASHER_ID, 4, { from: owner }))
+        .to.be.revertedWith('PowerOracleStaking::slash: Insufficient slasher deposit');
+    });
+
+    it('should deny non-powerOracle calling the method', async function() {
+      await expect(staking.slash(SLASHER_ID, 4, { from: owner }))
+        .to.be.revertedWith('PowerOracleStaking::slash: Only PowerOracle allowed');
+    });
+  })
 });

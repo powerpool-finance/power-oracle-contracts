@@ -55,7 +55,7 @@ describe('PowerOracle', function () {
 
   beforeEach(async function() {
     cvpToken = await MockCVP.new(ether(100000));
-    staking = await MockStaking.new(cvpToken.address);
+    staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
       MockOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
@@ -82,7 +82,7 @@ describe('PowerOracle', function () {
 
   describe('pokeFromReporter', () => {
     beforeEach(async () => {
-      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
       await staking.mockSetReporter(1, ether(300));
     });
 
@@ -262,9 +262,9 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
-      await staking.setUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
       await staking.mockSetReporter(1, ether(300));
-      await staking.setUser(2, alice, validSlasherPoker, alice, ether(100));
+      await staking.mockSetUser(2, alice, validSlasherPoker, alice, ether(100));
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
@@ -286,8 +286,7 @@ describe('PowerOracle', function () {
         newTimestamp: secondTimestamp
       })
 
-      const logs = await fetchLogs(MockStaking, res);
-      expectEvent({ logs }, 'MockSlash', {
+      expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
         overdueCount: '4'
       });
@@ -316,10 +315,9 @@ describe('PowerOracle', function () {
         tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
         oldTimestamp: firstTimestamp,
         newTimestamp: secondTimestamp
-      })
+      });
 
-      const logs = await fetchLogs(MockStaking, res);
-      expectEvent({ logs }, 'MockSlash', {
+      expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
         overdueCount: '2'
       });
@@ -411,8 +409,8 @@ describe('PowerOracle', function () {
   describe('withdrawing rewards', async function() {
     const USER_ID = 4;
     beforeEach(async () => {
-      await oracle.setUserReward(USER_ID, ether(250));
-      await staking.setUserFinancier(USER_ID, aliceFinancier)
+      await oracle.mockSetUserReward(USER_ID, ether(250));
+      await staking.mockSetUserFinancier(USER_ID, aliceFinancier)
     })
 
     it('should allow a valid user withdrawing their rewards', async function() {

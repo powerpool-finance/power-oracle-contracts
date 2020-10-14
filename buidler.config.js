@@ -6,6 +6,7 @@ usePlugin('buidler-contract-sizer');
 usePlugin('buidler-gas-reporter');
 
 require('./tasks/fetchPairValues')
+require('./tasks/deployTestnet')
 
 
 const config = {
@@ -33,6 +34,10 @@ const config = {
     },
     local: {
       url: 'http://127.0.0.1:8545',
+    },
+    kovan: {
+      url: 'https://kovan-eth.compound.finance',
+      accounts: ['YOUR_PRIVATE_KEY_HERE']
     },
     coverage: {
       url: 'http://127.0.0.1:8555',

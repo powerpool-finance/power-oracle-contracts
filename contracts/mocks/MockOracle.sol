@@ -15,7 +15,7 @@ contract MockOracle is PowerOracle {
   ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {
   }
 
-  function setUserReward(uint256 userId_, uint256 reward_) external {
+  function mockSetUserReward(uint256 userId_, uint256 reward_) external {
     rewards[userId_] = reward_;
   }
 
