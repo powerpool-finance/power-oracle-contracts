@@ -111,6 +111,12 @@ describe('PowerOracle', function () {
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
 
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker }))
+        .to.be.revertedWith('Pausable: paused');
+    });
+
     describe('rewards', () => {
       it('should not reward a reporter for reporting CVP and ETH', async function() {
         const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporterPoker });
@@ -363,6 +369,12 @@ describe('PowerOracle', function () {
       await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasherPoker }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
     });
+
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.pokeFromReporter(2, ['REP'], { from: validSlasherPoker }))
+        .to.be.revertedWith('Pausable: paused');
+    });
   });
 
   describe('poke (permissionless)', () => {
@@ -404,6 +416,12 @@ describe('PowerOracle', function () {
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    });
+
+    it('should deny poking when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.poke(['REP'], { from: bob }))
+        .to.be.revertedWith('Pausable: paused');
     });
   });
 
@@ -484,6 +502,36 @@ describe('PowerOracle', function () {
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
+
+    describe('pause', () => {
+      it('should allow the owner pausing the contract', async function() {
+        expect(await oracle.paused()).to.be.false;
+        await oracle.pause({ from: owner });
+        expect(await oracle.paused()).to.be.true;
+      });
+
+      it('should deny non-owner pausing the contract', async function() {
+        await expect(oracle.pause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
+
+    describe('unpause', () => {
+      beforeEach(async function() {
+        await oracle.pause({ from: owner });
+      });
+
+      it('should allow the owner unpausing the contract', async function() {
+        expect(await oracle.paused()).to.be.true;
+        await oracle.unpause({ from: owner });
+        expect(await oracle.paused()).to.be.false;
+      });
+
+      it('should deny non-owner unpausing the contract', async function() {
+        await expect(oracle.unpause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
   });
 
   describe('viewers', () => {

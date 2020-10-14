@@ -11,9 +11,10 @@ import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./UniswapTWAPProvider.sol";
 import "./interfaces/IPowerOracleStaking.sol";
+import "./utils/Pausable.sol";
 
 
-contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvider {
+contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
 
   uint256 public constant REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT = 100;
@@ -100,7 +101,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     return cvpPrice;
   }
 
-  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external {
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::pokeFromReporter: Missing token symbols");
 
@@ -121,7 +122,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     _rewardUser(reporterId_, rewardCount, ethPrice, cvpPrice);
   }
 
-  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external {
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::pokeFromSlasher: Missing token symbols");
 
@@ -143,7 +144,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
     }
   }
 
-  function poke(string[] memory symbols_) public {
+  function poke(string[] memory symbols_) public whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "PowerOracle::poke: Missing token symbols");
 
@@ -274,6 +275,14 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, UniswapTWAPProvide
   function setPowerOracleStaking(address powerOracleStaking_) external override onlyOwner {
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     emit SetPowerOracleStaking(powerOracleStaking_);
+  }
+
+  function pause() external override onlyOwner {
+    _pause();
+  }
+
+  function unpause() external override onlyOwner {
+    _unpause();
   }
 
   /*** Viewers ***/

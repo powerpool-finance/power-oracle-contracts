@@ -32,6 +32,10 @@ interface IPowerOracle {
     /// The owner sets the current report min/max in seconds
   function setReportIntervals(uint256 minInterval, uint256 maxInterval) external;
 
+  function pause() external;
+
+  function unpause() external;
+
 
   /*** Viewers ***/
   /// Get price by a token address
