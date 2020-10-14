@@ -15,8 +15,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
 
   uint256 public constant HUNDRED_PCT = 100 ether;
 
-  event CreateUser(uint256 indexed userId, address indexed adminKey, address pokerKey, address financierKey, uint256 initialDeposit);
-  event UpdateUser(uint256 indexed userId, address indexed adminKey, address pokerKey, address financierKey);
+  event CreateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey, uint256 initialDeposit);
+  event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey);
   event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
   event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
   event WithdrawExtraCVP(bool indexed sent, address indexed to, uint256 diff, uint256 erc20Balance, uint256 accountedTotalDeposits);
