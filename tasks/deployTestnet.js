@@ -185,7 +185,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('>>> Deploying PowerOracleStaking...');
     const staking = await deployProxied(
       PowerOracleStaking,
-      [cvpToken.address],
+      [cvpToken.address, deployer],
       [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, SET_USER_REWARD_COUNT],
       { proxyAdminOwner: OWNER }
     );
