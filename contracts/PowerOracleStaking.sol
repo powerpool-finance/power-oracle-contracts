@@ -50,8 +50,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
   uint256 public slasherSlashingRewardPct;
   uint256 public protocolSlashingRewardPct;
   uint256 public setUserRewardCount;
+  uint256 public userIdCounter;
 
-  uint256 internal _userIdCounter;
   uint256 internal _highestDeposit;
   uint256 internal _reporterId;
 
@@ -132,7 +132,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
 
   /// Creates a new user ID and stores the given keys
   function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override {
-    uint256 userId = ++_userIdCounter;
+    uint256 userId = ++userIdCounter;
 
     users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
 
