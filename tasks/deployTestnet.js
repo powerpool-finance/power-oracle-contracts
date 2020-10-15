@@ -75,6 +75,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     console.log('>>> Deploying uniswap router...');
     const router = await MockUniswapV2Router02.new(factory.address, deployedTokens[totalErc20StubsToDeploy.indexOf('USDT')].address);
+    console.log('>>> Router is deployed to', router.address)
 
     console.log('>>> Deploying uniswap pairs...');
 
@@ -163,7 +164,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     function getTokenConfigs() {
       let custom = [
-        {cToken: cToken.ETH, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: isReseved['ETH']},
+        {cToken: cToken.ETH, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: false},
         {cToken: cToken.USDT, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('USDT')].address, symbolHash: keccak256('USDT'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
         {cToken: cToken.USDC, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('USDC')].address, symbolHash: keccak256('USDC'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
       ];
@@ -202,6 +203,8 @@ task('deploy-testnet', 'Deploys testnet contracts')
     );
     console.log('>>> PowerOracle (proxy) deployed at', oracle.address);
     console.log('>>> PowerOracle implementation deployed at', oracle.initialImplementation.address);
+    console.log('>>> WETH deployed at', deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address);
+    console.log('>>> USDC deployed at', deployedTokens[totalErc20StubsToDeploy.indexOf('USDC')].address);
 
     console.log('>>> Setting powerOracle address in powerOracleStaking');
     await staking.setPowerOracle(oracle.address);
