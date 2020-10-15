@@ -74,7 +74,7 @@ describe('PowerOracle', function () {
       expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
       expect(await oracle.reservoir()).to.be.equal(reservoir);
       expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
-      expect(await oracle.reportReward()).to.be.equal(REPORT_REWARD_IN_ETH);
+      expect(await oracle.tokenReportReward()).to.be.equal(REPORT_REWARD_IN_ETH);
       expect(await oracle.maxCvpReward()).to.be.equal(MAX_CVP_REWARD);
       expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
       expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
@@ -456,12 +456,12 @@ describe('PowerOracle', function () {
   describe('owner methods', () => {
     describe('setReportReward', () => {
       it('should allow the owner setting a new report reward', async function() {
-        await oracle.setReportReward(42, { from: owner });
-        expect(await oracle.reportReward()).to.be.equal('42');
+        await oracle.setTokenReportReward(42, { from: owner });
+        expect(await oracle.tokenReportReward()).to.be.equal('42');
       });
 
       it('should deny non-reporter calling the method', async function() {
-        await expect(oracle.setReportReward(42, { from: alice }))
+        await expect(oracle.setTokenReportReward(42, { from: alice }))
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
