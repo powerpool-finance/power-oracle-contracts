@@ -10,43 +10,25 @@ interface IPowerOracle {
     GREATER_THAN_MAX
   }
 
-  /*** Current Reporter Or Slasher Interface ***/
-  /// Poke to update the given symbol prices
-  //  function poke(uint256 userId, string[] calldata symbolHashes) external;
-
-  /// Withdraw available rewards
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external;
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external;
+  function poke(string[] memory symbols_) external;
   function withdrawRewards(uint256 userId, address to) external;
 
   /*** PowerOracleStaking Interface ***/
   function rewardAddress(address to, uint256 count) external;
 
-
   /*** Owner Interface ***/
-  /// The owner sets the current reward per report in ETH tokens
-  function setReportReward(uint256 reportReward) external;
-
+  function setTokenReportReward(uint256 tokenReportReward) external;
   function setMaxCvpReward(uint256 maxCvpReward) external;
-
   function setPowerOracleStaking(address powerOracleStaking) external;
-
-    /// The owner sets the current report min/max in seconds
   function setReportIntervals(uint256 minInterval, uint256 maxInterval) external;
-
   function pause() external;
-
   function unpause() external;
 
-
   /*** Viewers ***/
-  /// Get price by a token address
   function getPriceByAsset(address token) external view returns (uint256);
-
-  /// Get price by a token symbol, like "USDC"
   function getPriceBySymbol(string calldata symbol) external view returns (uint256);
-
-  /// Get price by a token symbol hash, like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
   function getPriceBySymbolHash(bytes32 symbolHash) external view returns (uint256);
-
-  /// Get the underlying price of a cToken
   function getUnderlyingPrice(address cToken) external view returns (uint);
 }
