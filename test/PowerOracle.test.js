@@ -550,6 +550,7 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
       expect(await oracle.getUnderlyingPrice(CFG_CVP_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+      expect(await oracle.assetPrices(CFG_CVP_ADDRESS)).to.be.equal(ether('1.4'));
     });
 
     it('should respond with a correct values for FIXED_USD price', async function() {
@@ -559,6 +560,7 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
       expect(await oracle.getUnderlyingPrice(CFG_USDT_CTOKEN_ADDRESS)).to.be.equal(tether('1'));
+      expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(tether('1'));
     });
 
     it('should respond with a correct values for FIXED_ETH price', async function() {

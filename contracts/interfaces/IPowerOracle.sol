@@ -31,4 +31,5 @@ interface IPowerOracle {
   function getPriceBySymbol(string calldata symbol) external view returns (uint256);
   function getPriceBySymbolHash(bytes32 symbolHash) external view returns (uint256);
   function getUnderlyingPrice(address cToken) external view returns (uint);
+  function assetPrices(address token) external view returns (uint256);
 }
