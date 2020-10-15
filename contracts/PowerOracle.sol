@@ -4,14 +4,14 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
-import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
-import "./UniswapTWAPProvider.sol";
 import "./interfaces/IPowerOracleStaking.sol";
+import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
+import "./utils/Ownable.sol";
+import "./utils/SafeMath.sol";
 
 
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
@@ -24,38 +24,64 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint128 value;
   }
 
-  event SetReportReward(uint256 reportReward);
-  event SetReportIntervals(uint256 minReportInterval, uint256 maxReportInterval);
+  /// @notice The event emitted when a reporter calls a poke operation
+  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
 
-  /// @notice The event emitted when a reporter receives their reward for the report
+  /// @notice The event emitted when a slasher executes poke and slashes the current reporter
+  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 overdueCount);
+
+  /// @notice The event emitted when an arbitrary user calls poke operation
+  event Poke(address indexed poker, uint256 tokenCount);
+
+  /// @notice The event emitted when a reporter receives their reward for the report or an arbitrary user updates the current reporter address
   event RewardUser(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint calculatedReward);
 
   /// @notice The event emitted when a reporter is not eligible for a reward or rewards are disabled
   event RewardIgnored(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint256 calculatedReward, uint maxCvpReward);
 
+  /// @notice The event emitted when a reporter is missing pending tokens to update price for
   event NothingToReward(uint256 indexed userId, uint ethPrice);
+
+  /// @notice The event emitted when a powerOracleStaking asks to reward particular address
   event RewardAddress(address indexed to, uint256 count, uint256 amount);
 
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint price);
-  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
-  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 overdueCount);
-  event Poke(address indexed poker, uint256 tokenCount);
+
+  /// @notice The event emitted when the owner updates reportReward value
+  event SetReportReward(uint256 reportReward);
+
+  /// @notice The event emitted when the owner updates min/max report intervals
+  event SetReportIntervals(uint256 minReportInterval, uint256 maxReportInterval);
+
+  /// @notice The event emitted when the owner updates maxCvpReward value
   event SetMaxCvpReward(uint256 maxCvpReward);
+
+  /// @notice The event emitted when the owner updates powerOracleStaking address
   event SetPowerOracleStaking(address powerOracleStaking);
 
+  /// @notice CVP token address
   IERC20 public immutable cvpToken;
+
+  /// @notice CVP reservoir which should pre-approve some amount of tokens to this contract in order to let pay rewards
   address public immutable reservoir;
+
+  /// @notice The linked PowerOracleStaking contract address
   IPowerOracleStaking public powerOracleStaking;
 
-  /// @notice The limit in CVP for a reward for reportin a single token
+  /// @notice The limit in CVP reward for reporting a single token
   uint256 public maxCvpReward;
 
   /// @notice The reward in ETH for reporting a single token
-  uint256 public reportReward;
+  uint256 public tokenReportReward;
+
+  /// @notice Min report interval in seconds
   uint256 public minReportInterval;
+
+  /// @notice Max report interval in seconds
   uint256 public maxReportInterval;
 
+  /// @notice The accrued reward by a user ID
   mapping(uint256 => uint256) public rewards;
 
   /// @notice Official prices and timestamps by symbol hash
@@ -81,7 +107,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   ) external initializer {
     _transferOwnership(owner_);
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
-    reportReward = reportReward_;
+    tokenReportReward = reportReward_;
     maxCvpReward = maxCvpReward_;
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
@@ -99,63 +125,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 cvpPrice = fetchCvpPrice();
     _savePrice("CVP", cvpPrice);
     return cvpPrice;
-  }
-
-  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external whenNotPaused {
-    uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::pokeFromReporter: Missing token symbols");
-
-    powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
-
-    uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice();
-    uint256 rewardCount = 0;
-
-    // Try to update the view storage
-    for (uint256 i = 0; i < len; i++) {
-      if (_fetchAndSavePrice(symbols_[i], ethPrice) != ReportInterval.LESS_THAN_MIN) {
-        rewardCount++;
-      }
-    }
-
-    emit PokeFromReporter(reporterId_, len, rewardCount);
-    _rewardUser(reporterId_, rewardCount, ethPrice, cvpPrice);
-  }
-
-  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external whenNotPaused {
-    uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::pokeFromSlasher: Missing token symbols");
-
-    powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
-
-    uint256 ethPrice = _updateEthPrice();
-    uint256 overdueCount = 0;
-
-    // Try to update the view storage
-    for (uint256 i = 0; i < len; i++) {
-      if (_fetchAndSavePrice(symbols_[i], ethPrice) == ReportInterval.GREATER_THAN_MAX) {
-        overdueCount++;
-      }
-    }
-
-    emit PokeFromSlasher(slasherId_, len, overdueCount);
-    if (overdueCount > 0) {
-      powerOracleStaking.slash(slasherId_, overdueCount);
-    }
-  }
-
-  function poke(string[] memory symbols_) public whenNotPaused {
-    uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::poke: Missing token symbols");
-
-    uint256 ethPrice = _updateEthPrice();
-
-    // Try to update the view storage
-    for (uint256 i = 0; i < len; i++) {
-      _fetchAndSavePrice(symbols_[i], ethPrice);
-    }
-
-    emit Poke(msg.sender, len);
   }
 
   function _fetchAndSavePrice(string memory symbol_, uint ethPrice_) internal returns (ReportInterval) {
@@ -201,21 +170,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
   }
 
-  function calculateReward(uint256 count_, uint256 ethPrice_, uint256 cvpPrice_) public view returns(uint) {
-    if (count_ == 0) {
-      return 0;
-    }
-
-    require(ethPrice_ > 0, "calculateReward: ETH price is 0");
-    require(cvpPrice_ > 0, "calculateReward: CVP price is 0");
-    require(reportReward > 0, "calculateReward: ethReward is 0");
-
-    // return count * cvpReward * ethPrice / cvpPrice
-    uint singleTokenCvpReward = mul(reportReward, ethPrice_) / cvpPrice_;
-
-    return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
-  }
-
   function priceInternal(TokenConfig memory config_) internal view returns (uint) {
     if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
     if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
@@ -227,6 +181,83 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     revert("UniswapTWAPProvider::priceInternal: Unsupported case");
   }
 
+  /*** Pokers ***/
+
+  /**
+   * @notice A reporter pokes symbols with incentive to be rewarded
+   * @param reporterId_ The valid reporter's user ID
+   * @param symbols_ Asset symbols to poke
+   */
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external override whenNotPaused {
+    uint256 len = symbols_.length;
+    require(len > 0, "PowerOracle::pokeFromReporter: Missing token symbols");
+
+    powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
+
+    uint256 ethPrice = _updateEthPrice();
+    uint256 cvpPrice = _updateCvpPrice();
+    uint256 rewardCount = 0;
+
+    for (uint256 i = 0; i < len; i++) {
+      if (_fetchAndSavePrice(symbols_[i], ethPrice) != ReportInterval.LESS_THAN_MIN) {
+        rewardCount++;
+      }
+    }
+
+    emit PokeFromReporter(reporterId_, len, rewardCount);
+    _rewardUser(reporterId_, rewardCount, ethPrice, cvpPrice);
+  }
+
+  /**
+   * @notice A slasher pokes symbols with incentive to be rewarded
+   * @param slasherId_ The slasher's user ID
+   * @param symbols_ Asset symbols to poke
+   */
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external override whenNotPaused {
+    uint256 len = symbols_.length;
+    require(len > 0, "PowerOracle::pokeFromSlasher: Missing token symbols");
+
+    powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
+
+    uint256 ethPrice = _updateEthPrice();
+    uint256 overdueCount = 0;
+
+    for (uint256 i = 0; i < len; i++) {
+      if (_fetchAndSavePrice(symbols_[i], ethPrice) == ReportInterval.GREATER_THAN_MAX) {
+        overdueCount++;
+      }
+    }
+
+    emit PokeFromSlasher(slasherId_, len, overdueCount);
+    if (overdueCount > 0) {
+      powerOracleStaking.slash(slasherId_, overdueCount);
+    }
+  }
+
+  /**
+   * @notice Arbitrary user pokes symbols without being rewarded
+   * @param symbols_ Asset symbols to poke
+   */
+  function poke(string[] memory symbols_) external override whenNotPaused {
+    uint256 len = symbols_.length;
+    require(len > 0, "PowerOracle::poke: Missing token symbols");
+
+    uint256 ethPrice = _updateEthPrice();
+
+    for (uint256 i = 0; i < len; i++) {
+      _fetchAndSavePrice(symbols_[i], ethPrice);
+    }
+
+    emit Poke(msg.sender, len);
+  }
+
+  /*** PowerOracleStaking Interface ***/
+
+  /**
+   * @notice PowerOracleStaking rewards the given address the same way as reporter receives poke rewards
+   * @param to_ The address to reward
+   * @param count_ Multiplier to multiply the basic reward which equals to poke a single token reward
+   */
   function rewardAddress(address to_, uint256 count_) public override virtual {
     require(msg.sender == address(powerOracleStaking), "PowerOracle::rewardUser: Only Staking contract allowed");
     require(count_ < REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT, "PowerOracle::rewardUser: Count has a hard limit of 100");
@@ -242,7 +273,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     emit RewardAddress(to_, count_, amount);
   }
 
-  /// Withdraw available rewards
+  /**
+   * @notice Withdraw the available rewards
+   * @param userId_ The user ID to withdraw the reward for
+   * @param to_ The address to transfer the reward to
+   */
   function withdrawRewards(uint256 userId_, address to_) external override {
     powerOracleStaking.requireValidFinancierKey(userId_, msg.sender);
     require(to_ != address(0), "PowerOracle::withdrawRewards: Can't withdraw to 0 address");
@@ -254,38 +289,74 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   /*** Owner Interface ***/
-  /// The owner sets the current reward per report in ETH tokens
-  function setReportReward(uint256 reportReward_) external override onlyOwner {
-    reportReward = reportReward_;
-    emit SetReportReward(reportReward_);
+  /**
+   * @notice Sets a new reportReward value
+   * @param tokenReportReward_ The single token reward in ETH
+   */
+  function setTokenReportReward(uint256 tokenReportReward_) external override onlyOwner {
+    tokenReportReward = tokenReportReward_;
+    emit SetReportReward(tokenReportReward_);
   }
 
+  /**
+   * @notice The owner sets the max reward per token report in CVP tokens
+   * @param maxCvpReward_ The max token reward in CVP
+   */
   function setMaxCvpReward(uint256 maxCvpReward_) external override onlyOwner {
     maxCvpReward = maxCvpReward_;
     emit SetMaxCvpReward(maxCvpReward_);
   }
 
-  /// The owner sets the current report min/max in seconds
+  /**
+   * @notice The owner sets the current report min/max in seconds
+   * @param minReportInterval_ The minimum report interval for the reporter
+   * @param maxReportInterval_ The maximum report interval for the reporter
+   */
   function setReportIntervals(uint256 minReportInterval_, uint256 maxReportInterval_) external override onlyOwner {
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
     emit SetReportIntervals(minReportInterval_, maxReportInterval_);
   }
 
+  /**
+   * @notice The owner sets a new powerOracleStaking contract
+   * @param powerOracleStaking_ The poserOracleStaking contract address
+   */
   function setPowerOracleStaking(address powerOracleStaking_) external override onlyOwner {
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     emit SetPowerOracleStaking(powerOracleStaking_);
   }
 
+  /**
+   * @notice The owner pauses poke*-operations
+   */
   function pause() external override onlyOwner {
     _pause();
   }
 
+  /**
+   * @notice The owner unpauses poke*-operations
+   */
   function unpause() external override onlyOwner {
     _unpause();
   }
 
   /*** Viewers ***/
+
+  function calculateReward(uint256 count_, uint256 ethPrice_, uint256 cvpPrice_) public view returns(uint) {
+    if (count_ == 0) {
+      return 0;
+    }
+
+    require(ethPrice_ > 0, "calculateReward: ETH price is 0");
+    require(cvpPrice_ > 0, "calculateReward: CVP price is 0");
+    require(tokenReportReward > 0, "calculateReward: ethReward is 0");
+
+    // return count * cvpReward * ethPrice / cvpPrice
+    uint singleTokenCvpReward = mul(tokenReportReward, ethPrice_) / cvpPrice_;
+
+    return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
+  }
 
   /**
    * @notice Get the underlying price of a token
