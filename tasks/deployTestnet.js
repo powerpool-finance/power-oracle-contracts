@@ -13,8 +13,8 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const REPORT_REWARD_IN_ETH = ether('0.05');
     const MAX_CVP_REWARD = ether(15);
     const ANCHOR_PERIOD = 30;
-    const MIN_REPORT_INTERVAL = 60;
-    const MAX_REPORT_INTERVAL = 90;
+    const MIN_REPORT_INTERVAL = 60 * 5;
+    const MAX_REPORT_INTERVAL = 60 * 10;
     const MIN_SLASHING_DEPOSIT = ether(40);
     const SLASHER_REWARD_PCT = ether(15);
     const RESERVOIR_REWARD_PCT = ether(5);
@@ -179,7 +179,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
       return custom;
     }
 
-    const cvpToken = await MockCVP.new(ether(2e9));
+    const cvpToken = networkId === 42 ? await MockCVP.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2') : await MockCVP.new(ether(2e9));
     console.log('>>> CVP Token deployed at', cvpToken.address);
 
     console.log('>>> Deploying PowerOracleStaking...');
