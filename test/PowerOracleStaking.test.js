@@ -413,6 +413,7 @@ describe('PowerOracleStaking', function () {
 
       await staking.stubSetUser(REPORTER_ID, alice, alicePoker, aliceFinancier, ether(500), { from: bob });
       await staking.stubSetUser(SLASHER_ID, bob, bobPoker, bobFinancier, ether(60), { from: bob });
+      await staking.stubSetTotalDeposit(ether(560), { from: bob });
       await staking.stubSetReporter(REPORTER_ID, ether(600), { from: bob });
     });
 
@@ -420,9 +421,11 @@ describe('PowerOracleStaking', function () {
       expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
       expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
       expect(await cvpToken.balanceOf(reservoir)).to.be.equal('0');
+      expect(await staking.totalDeposit()).to.be.equal(ether(560));
 
       const res = await staking.slash(SLASHER_ID, 4, { from: powerOracle });
 
+      expect(await staking.totalDeposit()).to.be.equal(ether(530));
       // 500 - 100 - 30 = 370
       expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(370));
       // 100 + 100 = 200

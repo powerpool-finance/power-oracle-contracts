@@ -247,6 +247,9 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     // users[reporterId].deposit = reporterDeposit - slasherReward - reservoirReward;
     users[reporterId].deposit = reporterDeposit.sub(slasherReward).sub(reservoirReward);
 
+    // totalDeposit = totalDeposit - reservoirReward;
+    totalDeposit = totalDeposit.sub(reservoirReward);
+
     if (slasherReward > 0) {
       // uint256 slasherDepositAfter = users[slasherId_].deposit + slasherReward
       uint256 slasherDepositAfter = users[slasherId_].deposit.add(slasherReward);
