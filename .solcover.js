@@ -7,6 +7,7 @@ module.exports = {
   },
   mocha: {
     delay: false,
+    timeout: 20000
   },
   onCompileComplete: async function (_config) {
     // await run("typechain");
