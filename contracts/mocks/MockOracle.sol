@@ -24,7 +24,7 @@ contract MockOracle is PowerOracle {
   }
 
   event MockRewardAddress(address to, uint256 count);
-  function rewardAddress(address to_, uint256 count_) public override(PowerOracle) {
+  function rewardAddress(address to_, uint256 count_) external override(PowerOracle) {
     emit MockRewardAddress(to_, count_);
   }
 }

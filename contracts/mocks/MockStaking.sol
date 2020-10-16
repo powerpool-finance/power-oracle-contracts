@@ -15,7 +15,7 @@ contract MockStaking is PowerOracleStaking {
 
   event MockSlash(uint256 userId, uint256 overdueCount);
 
-  function slash(uint256 slasherId_, uint256 overdueCount_) public override(PowerOracleStaking) {
+  function slash(uint256 slasherId_, uint256 overdueCount_) external override(PowerOracleStaking) {
     emit MockSlash(slasherId_, overdueCount_);
   }
 

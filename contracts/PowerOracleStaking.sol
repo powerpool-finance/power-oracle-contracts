@@ -193,11 +193,11 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
 
     users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
 
+    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_, initialDeposit_);
+
     if (initialDeposit_ > 0) {
       _deposit(userId, initialDeposit_);
     }
-
-    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_, initialDeposit_);
   }
 
   /**
@@ -250,6 +250,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     // totalDeposit = totalDeposit - reservoirReward;
     totalDeposit = totalDeposit.sub(reservoirReward);
 
+    emit Slash(slasherId_, reporterId, overdueCount_, slasherReward, reservoirReward);
+
     if (slasherReward > 0) {
       // uint256 slasherDepositAfter = users[slasherId_].deposit + slasherReward
       uint256 slasherDepositAfter = users[slasherId_].deposit.add(slasherReward);
@@ -260,8 +262,6 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     if (reservoirReward > 0) {
       cvpToken.transfer(reservoir, reservoirReward);
     }
-
-    emit Slash(slasherId_, reporterId, overdueCount_, slasherReward, reservoirReward);
   }
 
   /*** Owner Interface ***/
