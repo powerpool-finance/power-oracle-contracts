@@ -9,6 +9,13 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const { deployProxied, ether, address, keccak256, uint } = require('../test/helpers');
     const { constants } = require('@openzeppelin/test-helpers');
 
+    const PowerOracleStaking = artifacts.require('PowerOracleStaking');
+    const PowerOracle = artifacts.require('PowerOracle');
+    const MockERC20 = artifacts.require('MockERC20');
+    const IUniswapV2Pair = artifacts.require('IUniswapV2Pair');
+    const MockUniswapFactory = artifacts.require('UniswapV2Factory');
+    const MockUniswapV2Router02 = artifacts.require('UniswapV2Router02');
+
     const { web3 } = PowerOracleStaking;
     const [deployer] = await web3.eth.getAccounts();
 
@@ -26,13 +33,6 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const OWNER = '0xe7F2f6bb028E2c01C2C34e01BFFe5f534E7f1901';
     // The same as deployer
     const RESERVOIR = deployer;
-
-    const PowerOracleStaking = artifacts.require('PowerOracleStaking');
-    const PowerOracle = artifacts.require('PowerOracle');
-    const MockERC20 = artifacts.require('MockERC20');
-    const IUniswapV2Pair = artifacts.require('IUniswapV2Pair');
-    const MockUniswapFactory = artifacts.require('UniswapV2Factory');
-    const MockUniswapV2Router02 = artifacts.require('UniswapV2Router02');
 
     const networkId = await web3.eth.net.getId();
 
