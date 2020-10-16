@@ -571,5 +571,40 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
       expect(await oracle.getUnderlyingPrice(CFG_ETH_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
     });
+
+    describe('calculateReward', () => {
+      beforeEach(async () => {
+        await oracle.setTokenReportReward(ether('0.02'), { from: owner })
+      });
+
+      it('should correctly calculate a reward', async () => {
+        expect(await oracle.calculateReward(3, String(320e18), String(5e18))).to.be.equal(ether('3.84'));
+        expect(await oracle.calculateReward(3, String(320e18), String(2.5e18))).to.be.equal(ether('7.68'));
+        expect(await oracle.calculateReward(3, String(320e18), String(1e18))).to.be.equal(ether('19.2'));
+      })
+
+      it('should use max CVP reward if a calculated reward overflows', async () => {
+        expect(await oracle.calculateReward(3, String(320e18), String(0.2e18))).to.be.equal(ether('45'));
+      })
+
+      it('should return 0 for 0 count', async () => {
+        expect(await oracle.calculateReward(0, 2, 2)).to.be.equal('0');
+      })
+
+      it('should should revert when ethReward is 0', async () => {
+        await oracle.setTokenReportReward(0, { from: owner });
+        await expect(oracle.calculateReward(1, 1, 3)).to.be.revertedWith('calculateReward: ethReward is 0');
+      })
+
+      it('should should revert when ETH price is 0', async () => {
+        await expect(oracle.calculateReward(1, 0, 3)).to.be.revertedWith('calculateReward: ETH price is 0');
+        // await expect(call(uniswapAnchoredView, 'calculateReward', [1, 0, 3])).rejects.toRevert('revert calculateReward: ETH price is 0');
+      })
+
+      it('should should revert when CVP price is 0', async () => {
+        await expect(oracle.calculateReward(1, 1, 0)).to.be.revertedWith('calculateReward: CVP price is 0');
+        // await expect(call(uniswapAnchoredView, 'calculateReward', [1, 1, 0])).rejects.toRevert('revert calculateReward: CVP price is 0');
+      })
+    });
   })
 });
