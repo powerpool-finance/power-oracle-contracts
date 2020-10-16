@@ -5,7 +5,7 @@ usePlugin('@nomiclabs/buidler-truffle5');
 
 
 task('deploy-testnet', 'Deploys testnet contracts')
-  .setAction(async (taskArgs) => {
+  .setAction(async () => {
     const { deployProxied, ether, address, keccak256, uint } = require('../test/helpers');
     const { constants } = require('@openzeppelin/test-helpers');
 
@@ -24,17 +24,17 @@ task('deploy-testnet', 'Deploys testnet contracts')
     // Max CVP Reward per report
     const MAX_CVP_REWARD = ether(15);
     // Anchor period for uniswap price checkpoint in seconds
-    const ANCHOR_PERIOD = 30;
+    const ANCHOR_PERIOD = 180;
     // In seconds
-    const MIN_REPORT_INTERVAL = 60;
+    const MIN_REPORT_INTERVAL = 270;
     // In seconds
-    const MAX_REPORT_INTERVAL = 90;
+    const MAX_REPORT_INTERVAL = 3600;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
     const MIN_SLASHING_DEPOSIT = ether(40);
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
-    const SLASHER_REWARD_PCT = ether(15);
+    const SLASHER_REWARD_PCT = ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
-    const RESERVOIR_REWARD_PCT = ether(5);
+    const RESERVOIR_REWARD_PCT = ether('0.005');
     // A multiplier to reward an outdated reporter ID updater who calls the permissionless setReporter() function.
     const SET_USER_REWARD_COUNT = 3;
     const MockCVP = artifacts.require('MockCVP');
@@ -56,9 +56,6 @@ task('deploy-testnet', 'Deploys testnet contracts')
       FIXED_USD: 1,
       REPORTER: 2
     };
-    const FIXED_ETH_AMOUNT = 0.005e18;
-
-    const dummyAddress = address(0);
 
     const uniswapPairs = require('../config/uniswapPairs');
     const withPairKeys = Object.keys(uniswapPairs.withPair);
@@ -141,11 +138,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
           1702603082,
         )
 
-        if (symbol === 'USDC') {
-          isReseved['ETH'] = true;
-        } else {
-          isReseved[symbol] = true;
-        }
+        isReseved[symbol] = true;
         console.log('>>> ETH ->', symbol);
       } else {
         await router.addLiquidity(
@@ -158,20 +151,27 @@ task('deploy-testnet', 'Deploys testnet contracts')
           deployer,
           1702603082,
         )
-        if (symbol === 'USDC') {
-          isReseved['ETH'] = false;
-        } else {
-          isReseved[symbol] = false;
-        }
+        isReseved[symbol] = false;
         console.log('>>>', symbol, '-> ETH');
       }
 
+      if (symbol === 'USDC') {
+        const eth = BigInt(ethToken.address);
+        const usdc = BigInt(oppositeToken.address);
+        if (eth > usdc) {
+          console.log('>>> ETH pair is reversed');
+          isReseved['ETH'] = true;
+        } else {
+          console.log('>>> ETH pair is NOT reversed');
+          isReseved['ETH'] = false;
+        }
+      }
       console.log('>>>', await pair.getReserves());
     }
 
     function getTokenConfigs() {
       let custom = [
-        {cToken: cToken.ETH, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: false},
+        {cToken: cToken.ETH, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address, symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: isReseved['ETH']},
         {cToken: cToken.USDT, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('USDT')].address, symbolHash: keccak256('USDT'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
         {cToken: cToken.USDC, underlying: deployedTokens[totalErc20StubsToDeploy.indexOf('USDC')].address, symbolHash: keccak256('USDC'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
       ];

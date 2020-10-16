@@ -2,7 +2,7 @@ const fs = require('fs');
 
 usePlugin('@nomiclabs/buidler-truffle5');
 
-task('pair-details', "Prints an account's balance")
+task('dump-pairs', "Prints an account's balance")
   .setAction(async (taskArgs) => {
     const MockUniswapTokenPair = artifacts.require('MockUniswapTokenPair');
     MockUniswapTokenPair.numberFormat = 'String';
