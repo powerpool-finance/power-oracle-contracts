@@ -4,14 +4,14 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
-import "./interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
 
 
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {

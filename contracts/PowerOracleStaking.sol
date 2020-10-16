@@ -3,12 +3,11 @@
 pragma solidity ^0.6.12;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
-import "@nomiclabs/buidler/console.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
-import "./interfaces/IERC20.sol";
 import "./utils/Pausable.sol";
 
 contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Pausable {
