@@ -74,6 +74,11 @@ describe('PowerOracle', function () {
       expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
       expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
     });
+
+    it('should deny initializing again', async function() {
+      await expect(oracle.initialize(owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
+        .to.be.revertedWith('Contract instance has already been initialized')
+    });
   })
 
   describe('pokeFromReporter', () => {

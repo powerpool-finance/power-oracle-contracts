@@ -56,6 +56,11 @@ describe('PowerOracleStaking', function () {
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
       expect(await staking.setUserRewardCount()).to.be.equal(SET_USER_REWARD_COUNT.toString());
     });
+
+    it('should deny initializing again', async function() {
+      await expect(staking.initialize(owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT))
+        .to.be.revertedWith('Contract instance has already been initialized')
+    });
   })
 
   describe('user interface', () => {
