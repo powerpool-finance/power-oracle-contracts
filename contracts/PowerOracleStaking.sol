@@ -9,8 +9,9 @@ import "./interfaces/IPowerOracle.sol";
 import "./utils/Ownable.sol";
 import "./utils/SafeMath.sol";
 import "./interfaces/IERC20.sol";
+import "./utils/Pausable.sol";
 
-contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
+contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Pausable {
   using SafeMath for uint256;
 
   uint256 public constant HUNDRED_PCT = 100 ether;
@@ -125,7 +126,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
    * @param userId_ The user ID to make deposit for
    * @param amount_ The amount in CVP tokens to deposit
    */
-  function deposit(uint256 userId_, uint256 amount_) external override {
+  function deposit(uint256 userId_, uint256 amount_) external override whenNotPaused {
     require(amount_ > 0, "PowerOracleStaking::deposit: Missing amount");
     require(users[userId_].adminKey != address(0), "PowerOracleStaking::deposit: Admin key can't be empty");
 
@@ -188,7 +189,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
    * @param financierKey_ The financier key for the new user
    * @param initialDeposit_ The initial deposit to be transferred to this contract
    */
-  function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override {
+  function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override whenNotPaused {
     uint256 userId = ++userIdCounter;
 
     users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
@@ -320,6 +321,20 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable {
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = protocolSlashingRewardPct_;
     emit SetSlashingPct(slasherSlashingRewardPct_, protocolSlashingRewardPct_);
+  }
+
+  /**
+   * @notice The owner pauses poke*-operations
+   */
+  function pause() external override onlyOwner {
+    _pause();
+  }
+
+  /**
+   * @notice The owner unpauses poke*-operations
+   */
+  function unpause() external override onlyOwner {
+    _unpause();
   }
 
   /*** Permissionless Interface ***/

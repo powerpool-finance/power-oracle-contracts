@@ -115,6 +115,12 @@ describe('PowerOracleStaking', function () {
         res = await staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob });
         expectEvent(res, 'CreateUser', { userId: '3' });
       });
+
+      it('should deny creating a user when the contract is paused', async function() {
+        await staking.pause({ from: owner });
+        await expect(staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob }))
+          .to.be.revertedWith('Pausable: paused');
+      });
     });
 
     describe('updateUser', () => {
@@ -212,6 +218,12 @@ describe('PowerOracleStaking', function () {
       it('should deny depositing for a non-existing user', async function() {
         await expect(staking.deposit(3, ether(30), { from: bob }))
           .to.be.revertedWith('PowerOracleStaking::deposit: Admin key can\'t be empty');
+      });
+
+      it('should deny creating a user when the contract is paused', async function() {
+        await staking.pause({ from: owner });
+        await expect(staking.deposit(1, ether(10), { from: bob }))
+          .to.be.revertedWith('Pausable: paused');
       });
     })
 
@@ -370,6 +382,36 @@ describe('PowerOracleStaking', function () {
           .to.be.revertedWith('Ownable: caller is not the owner');
       })
     });
+
+    describe('pause', () => {
+      it('should allow the owner pausing the contract', async function() {
+        expect(await staking.paused()).to.be.false;
+        await staking.pause({ from: owner });
+        expect(await staking.paused()).to.be.true;
+      });
+
+      it('should deny non-owner pausing the contract', async function() {
+        await expect(staking.pause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
+
+    describe('unpause', () => {
+      beforeEach(async function() {
+        await staking.pause({ from: owner });
+      });
+
+      it('should allow the owner unpausing the contract', async function() {
+        expect(await staking.paused()).to.be.true;
+        await staking.unpause({ from: owner });
+        expect(await staking.paused()).to.be.false;
+      });
+
+      it('should deny non-owner unpausing the contract', async function() {
+        await expect(staking.unpause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
   });
 
   describe('setReporter', () => {
