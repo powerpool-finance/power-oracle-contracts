@@ -11,13 +11,21 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     const I1E30 = '1000000000000000000000000000000';
     const REPORT_REWARD_IN_ETH = ether('0.05');
+    // Max CVP Reward per report
     const MAX_CVP_REWARD = ether(15);
+    // Anchor period for uniswap price checkpoint in seconds
     const ANCHOR_PERIOD = 30;
+    // In seconds
     const MIN_REPORT_INTERVAL = 60;
+    // In seconds
     const MAX_REPORT_INTERVAL = 90;
+    // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
     const MIN_SLASHING_DEPOSIT = ether(40);
+    // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const SLASHER_REWARD_PCT = ether(15);
+    // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const RESERVOIR_REWARD_PCT = ether(5);
+    // A multiplier to reward an outdated reporter ID updater who calls the permissionless setReporter() function.
     const SET_USER_REWARD_COUNT = 3;
     const MockCVP = artifacts.require('MockCVP');
     const OWNER = '0xe7F2f6bb028E2c01C2C34e01BFFe5f534E7f1901';
