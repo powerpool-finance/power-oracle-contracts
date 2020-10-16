@@ -7,30 +7,25 @@ const { solidity } = require('ethereum-waffle');
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
 const MockStaking = artifacts.require('MockStaking');
-const MockOracle = artifacts.require('MockOracle');
+const StubOracle = artifacts.require('StubOracle');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
-MockOracle.numberFormat = 'String';
+StubOracle.numberFormat = 'String';
 
-const DAI_SYMBOL_HASH = keccak256('DAI');
 const ETH_SYMBOL_HASH = keccak256('ETH');
 const CVP_SYMBOL_HASH = keccak256('CVP');
 const USDT_SYMBOL_HASH = keccak256('USDT');
 const REPORT_REWARD_IN_ETH = ether('0.05');
 const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = '45';
-const ANCHOR_PERIOD_INT = 45;
 const MIN_REPORT_INTERVAL = '30';
 const MIN_REPORT_INTERVAL_INT = 30;
 const MAX_REPORT_INTERVAL = '90';
 const MAX_REPORT_INTERVAL_INT = 90;
-const MIN_SLASHING_DEPOSIT = ether(40);
-const SLASHER_REWARD_PCT = ether(15);
-const RESERVOIR_REWARD_PCT = ether(5);
 
 function expectPriceUpdateEvent(config) {
   const { response, tokenSymbols, oldTimestamp, newTimestamp } = config;
@@ -58,7 +53,7 @@ describe('PowerOracle', function () {
     cvpToken = await MockCVP.new(ether(100000));
     staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
-      MockOracle,
+      StubOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
       [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
@@ -428,7 +423,7 @@ describe('PowerOracle', function () {
   describe('withdrawing rewards', async function() {
     const USER_ID = 4;
     beforeEach(async () => {
-      await oracle.mockSetUserReward(USER_ID, ether(250));
+      await oracle.stubSetUserReward(USER_ID, ether(250));
       await staking.mockSetUserFinancier(USER_ID, aliceFinancier)
     })
 
@@ -450,6 +445,41 @@ describe('PowerOracle', function () {
     it('should deny withdrawing to 0 address', async function() {
       await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: aliceFinancier }))
         .to.be.revertedWith("PowerOracle::withdrawRewards: Can't withdraw to 0 address");
+    });
+  });
+
+  describe('rewardAddress', () => {
+    beforeEach(async () => {
+      await oracle.setPowerOracleStaking(bob, { from: owner });
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, String(5e18));
+      await oracle.stubSetPrice(ETH_SYMBOL_HASH, String(320e18));
+      await oracle.poke(['CVP', 'ETH']);
+      await time.increase(120);
+    })
+
+    it('should allow the powerOracleStaking contract rewarding any address', async function() {
+      const res = await oracle.rewardAddress(sink, 3, { from: bob });
+      expectEvent(res, 'RewardAddress', {
+        to: sink,
+        count: '3',
+        amount: '7227'
+      })
+      expect(await cvpToken.balanceOf(sink)).to.be.equal('7227');
+    });
+
+    it('should deny non-powerOracleStaking contract rewarding any address', async function() {
+      await expect(oracle.rewardAddress(sink, 3, { from: alice }))
+        .to.be.revertedWith('PowerOracle::rewardUser: Only Staking contract allowed');
+    });
+
+    it('should deny rewarding with 0 count', async function() {
+      await expect(oracle.rewardAddress(sink, 0, { from: bob }))
+        .to.be.revertedWith('PowerOracle::rewardUser: Count should be positive');
+    });
+
+    it('should deny rewarding with more than 100 count', async function() {
+      await expect(oracle.rewardAddress(sink, 101, { from: bob }))
+        .to.be.revertedWith('PowerOracle::rewardUser: Count has a hard limit of 100');
     });
   });
 
@@ -544,7 +574,7 @@ describe('PowerOracle', function () {
     const CFG_ETH_CTOKEN_ADDRESS = address(1);
 
     it('should respond with a correct values for a reported price', async function() {
-      await oracle.mockSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
 
       expect(await oracle.getPriceByAsset(CFG_CVP_ADDRESS)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
@@ -554,7 +584,7 @@ describe('PowerOracle', function () {
     });
 
     it('should respond with a correct values for FIXED_USD price', async function() {
-      await oracle.mockSetPrice(USDT_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.4'));
 
       expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
@@ -564,7 +594,7 @@ describe('PowerOracle', function () {
     });
 
     it('should respond with a correct values for FIXED_ETH price', async function() {
-      await oracle.mockSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
 
       expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
