@@ -269,6 +269,16 @@ describe('PowerOracleStaking', function () {
         await expect(staking.withdraw(USER_ID, sink, ether(101), { from: aliceFinancier }))
           .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
       });
+
+      it('should deny withdrawing 0 balance', async function() {
+        await expect(staking.withdraw(USER_ID, sink, 0, { from: aliceFinancier }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Missing amount');
+      });
+
+      it('should deny withdrawing to 0 address', async function() {
+        await expect(staking.withdraw(USER_ID, constants.ZERO_ADDRESS, ether(30), { from: aliceFinancier }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Can\'t transfer to 0 address');
+      });
     });
   });
 
@@ -405,6 +415,16 @@ describe('PowerOracleStaking', function () {
         count: '3'
       })
       expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
+    });
+
+    it('should deny setting reporter with not the highest deposit', async function() {
+      await staking.stubSetUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.stubSetUser(2, bob, bobPoker, bobFinancier, ether(100), { from: bob });
+
+      await staking.stubSetReporter(1, ether(300));
+
+      await expect(staking.setReporter(2))
+        .to.be.revertedWith('PowerOracleStaking::setReporter: Insufficient candidate deposit');
     });
   });
 
