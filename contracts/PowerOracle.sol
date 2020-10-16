@@ -4,14 +4,14 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
-import "./interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
-import "./utils/SafeMath.sol";
 
 
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
@@ -258,7 +258,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param to_ The address to reward
    * @param count_ Multiplier to multiply the basic reward which equals to poke a single token reward
    */
-  function rewardAddress(address to_, uint256 count_) public override virtual {
+  function rewardAddress(address to_, uint256 count_) external override virtual {
     require(msg.sender == address(powerOracleStaking), "PowerOracle::rewardUser: Only Staking contract allowed");
     require(count_ < REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT, "PowerOracle::rewardUser: Count has a hard limit of 100");
     require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
@@ -267,10 +267,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 cvpPrice = _updateCvpPrice();
 
     uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
+    emit RewardAddress(to_, count_, amount);
+
     if (amount > 0) {
       cvpToken.transferFrom(reservoir, to_, amount);
     }
-    emit RewardAddress(to_, count_, amount);
   }
 
   /**

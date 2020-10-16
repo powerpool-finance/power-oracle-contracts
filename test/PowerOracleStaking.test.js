@@ -56,6 +56,11 @@ describe('PowerOracleStaking', function () {
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
       expect(await staking.setUserRewardCount()).to.be.equal(SET_USER_REWARD_COUNT.toString());
     });
+
+    it('should deny initializing again', async function() {
+      await expect(staking.initialize(owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT))
+        .to.be.revertedWith('Contract instance has already been initialized')
+    });
   })
 
   describe('user interface', () => {
@@ -109,6 +114,12 @@ describe('PowerOracleStaking', function () {
         expectEvent(res, 'CreateUser', { userId: '2' });
         res = await staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob });
         expectEvent(res, 'CreateUser', { userId: '3' });
+      });
+
+      it('should deny creating a user when the contract is paused', async function() {
+        await staking.pause({ from: owner });
+        await expect(staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob }))
+          .to.be.revertedWith('Pausable: paused');
       });
     });
 
@@ -208,6 +219,12 @@ describe('PowerOracleStaking', function () {
         await expect(staking.deposit(3, ether(30), { from: bob }))
           .to.be.revertedWith('PowerOracleStaking::deposit: Admin key can\'t be empty');
       });
+
+      it('should deny creating a user when the contract is paused', async function() {
+        await staking.pause({ from: owner });
+        await expect(staking.deposit(1, ether(10), { from: bob }))
+          .to.be.revertedWith('Pausable: paused');
+      });
     })
 
     describe('withdraw', () => {
@@ -263,6 +280,16 @@ describe('PowerOracleStaking', function () {
       it('should deny withdrawing more than the rewards balance', async function() {
         await expect(staking.withdraw(USER_ID, sink, ether(101), { from: aliceFinancier }))
           .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
+      });
+
+      it('should deny withdrawing 0 balance', async function() {
+        await expect(staking.withdraw(USER_ID, sink, 0, { from: aliceFinancier }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Missing amount');
+      });
+
+      it('should deny withdrawing to 0 address', async function() {
+        await expect(staking.withdraw(USER_ID, constants.ZERO_ADDRESS, ether(30), { from: aliceFinancier }))
+          .to.be.revertedWith('PowerOracleStaking::withdraw: Can\'t transfer to 0 address');
       });
     });
   });
@@ -355,6 +382,36 @@ describe('PowerOracleStaking', function () {
           .to.be.revertedWith('Ownable: caller is not the owner');
       })
     });
+
+    describe('pause', () => {
+      it('should allow the owner pausing the contract', async function() {
+        expect(await staking.paused()).to.be.false;
+        await staking.pause({ from: owner });
+        expect(await staking.paused()).to.be.true;
+      });
+
+      it('should deny non-owner pausing the contract', async function() {
+        await expect(staking.pause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
+
+    describe('unpause', () => {
+      beforeEach(async function() {
+        await staking.pause({ from: owner });
+      });
+
+      it('should allow the owner unpausing the contract', async function() {
+        expect(await staking.paused()).to.be.true;
+        await staking.unpause({ from: owner });
+        expect(await staking.paused()).to.be.false;
+      });
+
+      it('should deny non-owner unpausing the contract', async function() {
+        await expect(staking.unpause({ from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    })
   });
 
   describe('setReporter', () => {
@@ -400,6 +457,16 @@ describe('PowerOracleStaking', function () {
         count: '3'
       })
       expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
+    });
+
+    it('should deny setting reporter with not the highest deposit', async function() {
+      await staking.stubSetUser(1, alice, alicePoker, aliceFinancier, ether(100), { from: bob });
+      await staking.stubSetUser(2, bob, bobPoker, bobFinancier, ether(100), { from: bob });
+
+      await staking.stubSetReporter(1, ether(300));
+
+      await expect(staking.setReporter(2))
+        .to.be.revertedWith('PowerOracleStaking::setReporter: Insufficient candidate deposit');
     });
   });
 
