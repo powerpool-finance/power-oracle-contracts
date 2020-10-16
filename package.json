@@ -13,6 +13,7 @@
     "@ethersproject/abstract-signer": "^5.0.1",
     "@ethersproject/bignumber": "^5.0.3",
     "@nomiclabs/buidler": "^1.4.4",
+    "@nomiclabs/buidler-etherscan": "^2.1.0",
     "@nomiclabs/buidler-truffle5": "^1.3.4",
     "@nomiclabs/buidler-web3": "^1.3.3",
     "@openzeppelin/contracts": "^3.2.0",
@@ -76,7 +77,8 @@
     "pairs": "buidler pair-details --network mainnet",
     "report:size": "buidler size-contracts",
     "report:gas": "./scripts/gasUsedReport.sh",
-    "typechain": "buidler typechain"
+    "typechain": "buidler typechain",
+    "verify": "buidler verify"
   },
   "dependencies": {
     "@nomiclabs/buidler-ethers": "^2.0.0",

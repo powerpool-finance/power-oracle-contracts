@@ -1,6 +1,7 @@
 const { usePlugin } = require('@nomiclabs/buidler/config');
 
 usePlugin('@nomiclabs/buidler-truffle5');
+usePlugin('@nomiclabs/buidler-etherscan');
 usePlugin('solidity-coverage');
 usePlugin('buidler-contract-sizer');
 usePlugin('buidler-gas-reporter');
@@ -17,6 +18,9 @@ const config = {
   contractSizer: {
     alphaSort: false,
     runOnCompile: false,
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY
   },
   defaultNetwork: 'buidlerevm',
   gasReporter: {
@@ -39,7 +43,6 @@ const config = {
     kovan: {
       url: 'https://kovan-eth.compound.finance',
       gasPrice: 1000000000,
-      accounts: ['YOUR_PRIVATE_KEY_HERE']
     },
     coverage: {
       url: 'http://127.0.0.1:8555',
