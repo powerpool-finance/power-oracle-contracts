@@ -9,6 +9,9 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const { deployProxied, ether, address, keccak256, uint } = require('../test/helpers');
     const { constants } = require('@openzeppelin/test-helpers');
 
+    const { web3 } = PowerOracleStaking;
+    const [deployer] = await web3.eth.getAccounts();
+
     const I1E30 = '1000000000000000000000000000000';
     const REPORT_REWARD_IN_ETH = ether('0.05');
     // Max CVP Reward per report
@@ -30,8 +33,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const MockCVP = artifacts.require('MockCVP');
     const OWNER = '0xe7F2f6bb028E2c01C2C34e01BFFe5f534E7f1901';
     // The same as deployer
-    // const RESERVOIR = '0x0A243E1867F682D6c6e7b446a43800977ff58024';
-    const RESERVOIR = '0xfE2AB24d7855093E3d90aa298a676FEDA9fab7a0';
+    const RESERVOIR = deployer;
 
     const PowerOracleStaking = artifacts.require('PowerOracleStaking');
     const PowerOracle = artifacts.require('PowerOracle');
@@ -40,8 +42,6 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const MockUniswapFactory = artifacts.require('UniswapV2Factory');
     const MockUniswapV2Router02 = artifacts.require('UniswapV2Router02');
 
-    const { web3 } = PowerOracleStaking;
-
     const networkId = await web3.eth.net.getId();
 
     PowerOracleStaking.numberFormat = 'String';
@@ -49,7 +49,6 @@ task('deploy-testnet', 'Deploys testnet contracts')
     MockERC20.numberFormat = 'String';
     IUniswapV2Pair.numberFormat = 'String';
 
-    const [deployer] = await web3.eth.getAccounts();
     console.log('Deployer address is', deployer);
 
     const PriceSource = {
@@ -188,7 +187,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
       return custom;
     }
 
-    const cvpToken = await MockCVP.new(ether(2e9));
+    const cvpToken = networkId === 42 ? await MockCVP.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2') : await MockCVP.new(ether(2e9));
     console.log('>>> CVP Token deployed at', cvpToken.address);
 
     console.log('>>> Deploying PowerOracleStaking...');

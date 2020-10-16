@@ -401,4 +401,16 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
     return mul(1e30, priceInternal(config)) / config.baseUnit;
   }
+
+  /**
+   * @notice Get the price by underlying address
+   * @dev Implements the old PriceOracle interface for Compound v2.
+   * @param token_ The underlying address for price retrieval
+   * @return Price denominated in USD, with 18 decimals, for the given underlying address
+   */
+  function assetPrices(address token_) external view override returns (uint) {
+    TokenConfig memory config = getTokenConfigByUnderlying(token_);
+    // Return price in the same format as getUnderlyingPrice, but by token address
+    return mul(1e30, priceInternal(config)) / config.baseUnit;
+  }
 }
