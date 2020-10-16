@@ -24,9 +24,9 @@ task('deploy-testnet', 'Deploys testnet contracts')
     // Max CVP Reward per report
     const MAX_CVP_REWARD = ether(15);
     // Anchor period for uniswap price checkpoint in seconds
-    const ANCHOR_PERIOD = 180;
+    const ANCHOR_PERIOD = 1800;
     // In seconds
-    const MIN_REPORT_INTERVAL = 270;
+    const MIN_REPORT_INTERVAL = 2700;
     // In seconds
     const MAX_REPORT_INTERVAL = 3600;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
@@ -190,6 +190,12 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const cvpToken = networkId === 42 ? await MockCVP.at('0x86D0FFCf65eE225217e0Fe85DDB2B79A8CE7eDE2') : await MockCVP.new(ether(2e9));
     console.log('>>> CVP Token deployed at', cvpToken.address);
 
+    fs.writeFileSync('./tmp/latestStakingDeployArguments.js', `module.exports = ${JSON.stringify(
+      [cvpToken.address, deployer],
+      null,
+      2
+    )}`);
+
     console.log('>>> Deploying PowerOracleStaking...');
     const staking = await deployProxied(
       PowerOracleStaking,
@@ -201,10 +207,15 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('>>> PowerOracleStaking implementation deployed at', staking.initialImplementation.address);
 
     console.log('>>> Deploying PowerOracle...');
-    // console.log('>>>TokenConfigs', getTokenConfigs());
+    const tokenConfigs = getTokenConfigs();
+    fs.writeFileSync('./tmp/latestOracleDeployArguments.js', `module.exports = ${JSON.stringify(
+      [cvpToken.address, RESERVOIR, ANCHOR_PERIOD, tokenConfigs],
+      null,
+      2
+    )}`);
     const oracle = await deployProxied(
       PowerOracle,
-      [cvpToken.address, RESERVOIR, ANCHOR_PERIOD, getTokenConfigs()],
+      [cvpToken.address, RESERVOIR, ANCHOR_PERIOD, tokenConfigs],
       [OWNER, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: OWNER }
     );
@@ -220,7 +231,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     await staking.transferOwnership(OWNER);
 
     console.log('>>> Approving 10 000 CVP from fake reservoir (deployer) to PowerOracle');
-    await cvpToken.approve(oracle.address, 10000);
+    await cvpToken.approve(oracle.address, ether(10000));
 
     console.log('>>> Making the initial poke');
     await oracle.poke(withPairKeys.filter(p => p !== 'USDC'));
