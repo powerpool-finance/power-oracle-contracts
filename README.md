@@ -1,6 +1,6 @@
 # Power Oracle Contracts
 
-Power Oracle is a decentralized cross-chain price working on Ethereum Main Network and sidechains. Power Oracle uses Uniswap V2 as its primary source of time-weighted average prices (TWAPs) and introduces economic incentives for independent price reporters.
+Power Oracle is a decentralized cross-chain price oracle working on Ethereum Main Network and sidechains. Power Oracle uses Uniswap V2 as its primary source of time-weighted average prices (TWAPs) and introduces economic incentives for independent price reporters.
 
 🚨 **Security review status: unaudited**
 
