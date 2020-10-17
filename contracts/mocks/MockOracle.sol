@@ -5,15 +5,14 @@ pragma experimental ABIEncoderV2;
 
 import "../PowerOracle.sol";
 
-
 contract MockOracle is PowerOracle {
   constructor(
     address cvpToken_,
     address reservoir_,
     uint256 anchorPeriod_,
     TokenConfig[] memory configs_
-  ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {
-  }
+  ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {}
+
   mapping(bytes32 => uint256) public mockedAnchorPrices;
 
   function mockSetUserReward(uint256 userId_, uint256 reward_) external {
@@ -25,7 +24,12 @@ contract MockOracle is PowerOracle {
   }
 
   event MockFetchMockedAnchorPrice(string symbol);
-  function fetchAnchorPrice(string memory symbol, TokenConfig memory config, uint conversionFactor) internal override returns (uint) {
+
+  function fetchAnchorPrice(
+    string memory symbol,
+    TokenConfig memory config,
+    uint256 conversionFactor
+  ) internal override returns (uint256) {
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol));
     if (mockedAnchorPrices[symbolHash] > 0) {
       emit MockFetchMockedAnchorPrice(symbol);

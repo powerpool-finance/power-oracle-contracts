@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-// A  modified version of https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.2.0/contracts/utils/Pausable.sol
+// A modified version of https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.2.0/contracts/utils/Pausable.sol
 // with no GSN Context support and no construct
 
 pragma solidity ^0.6.0;
