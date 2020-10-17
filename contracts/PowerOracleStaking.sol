@@ -16,16 +16,16 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   uint256 public constant HUNDRED_PCT = 100 ether;
 
   /// @notice The event emitted when a new user is created
-  event CreateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey, uint256 initialDeposit);
+  event CreateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, uint256 initialDeposit);
 
   /// @notice The event emitted when an existing user is updated
-  event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey);
+  event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey);
 
   /// @notice The event emitted when an existing user is updated
   event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
 
-  /// @notice The event emitted when a valid financier key withdraws funds deposited for the given user ID
-  event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
+  /// @notice The event emitted when a valid admin key withdraws funds deposited for the given user ID
+  event Withdraw(uint256 indexed userId, address indexed adminKey, address indexed to, uint256 amount, uint256 depositAfter);
 
   /// @notice The event emitted when the owner withdraws the extra CVP amount from the contract
   event WithdrawExtraCVP(bool indexed sent, address indexed to, uint256 diff, uint256 erc20Balance, uint256 accountedTotalDeposits);
@@ -57,7 +57,6 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   struct User {
     address adminKey;
     address pokerKey;
-    address financierKey;
     uint256 deposit;
   }
 
@@ -158,7 +157,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   }
 
   /**
-   * @notice A valid users financier key withdraws the deposited stake form the contract
+   * @notice A valid users admin key withdraws the deposited stake form the contract
    * @param userId_ The user ID to withdraw deposit from
    * @param to_ The address to send the CVP tokens to
    * @param amount_ The amount in CVP tokens to withdraw
@@ -168,7 +167,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     require(to_ != address(0), "PowerOracleStaking::withdraw: Can't transfer to 0 address");
 
     User storage user = users[userId_];
-    require(msg.sender == user.financierKey, "PowerOracleStaking::withdraw: Only user's financier key allowed");
+    require(msg.sender == user.adminKey, "PowerOracleStaking::withdraw: Only user's admin key allowed");
 
     uint256 depositBefore = user.deposit;
     require(amount_ <= depositBefore, "PowerOracleStaking::withdraw: Amount exceeds deposit");
@@ -185,15 +184,14 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @notice Creates a new user ID and stores the given keys
    * @param adminKey_ The admin key for the new user
    * @param pokerKey_ The poker key for the new user
-   * @param financierKey_ The financier key for the new user
    * @param initialDeposit_ The initial deposit to be transferred to this contract
    */
-  function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override whenNotPaused {
+  function createUser(address adminKey_, address pokerKey_, uint256 initialDeposit_) external override whenNotPaused {
     uint256 userId = ++userIdCounter;
 
-    users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
+    users[userId] = User(adminKey_, pokerKey_, 0);
 
-    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_, initialDeposit_);
+    emit CreateUser(userId, adminKey_, pokerKey_, initialDeposit_);
 
     if (initialDeposit_ > 0) {
       _deposit(userId, initialDeposit_);
@@ -204,9 +202,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @notice Updates an existing user, only the current adminKey is eligible calling this method.
    * @param adminKey_ The new admin key for the user
    * @param pokerKey_ The new poker key for the user
-   * @param financierKey_ The new financier key for the user
    */
-  function updateUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_) external override {
+  function updateUser(uint256 userId_, address adminKey_, address pokerKey_) external override {
     User storage user = users[userId_];
     require(msg.sender == user.adminKey, "PowerOracleStaking::updateUser: Only admin allowed");
 
@@ -216,11 +213,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     if (pokerKey_ != user.pokerKey) {
       user.pokerKey = pokerKey_;
     }
-    if (financierKey_ != user.financierKey) {
-      user.financierKey = financierKey_;
-    }
 
-    emit UpdateUser(userId_, adminKey_, pokerKey_, financierKey_);
+    emit UpdateUser(userId_, adminKey_, pokerKey_);
   }
 
   /*** PowerOracle Contract Interface ***/
@@ -392,7 +386,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid poker key");
   }
 
-  function requireValidFinancierKey(uint256 userId_, address financier_) external view override {
-    require(users[userId_].financierKey == financier_, "PowerOracleStaking::requireValidFinancier: Invalid financier");
+  function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
+    require(users[userId_].adminKey == adminKey_, "PowerOracleStaking::requireValidAdminKey: Invalid admin key");
   }
 }

@@ -54,10 +54,10 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, aliceFinancier, sink;
+  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, sink;
 
   before(async function() {
-    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, aliceFinancier, sink] = await web3.eth.getAccounts();
+    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -94,7 +94,7 @@ describe('PowerOracle', function () {
 
   describe('pokeFromReporter', () => {
     beforeEach(async () => {
-      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, ether(300));
       await staking.mockSetReporter(1, ether(300));
     });
 
@@ -311,9 +311,9 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
-      await staking.mockSetUser(1, alice, validReporterPoker, alice, ether(300));
+      await staking.mockSetUser(1, alice, validReporterPoker, ether(300));
       await staking.mockSetReporter(1, ether(300));
-      await staking.mockSetUser(2, alice, validSlasherPoker, alice, ether(100));
+      await staking.mockSetUser(2, alice, validSlasherPoker, ether(100));
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
@@ -471,26 +471,26 @@ describe('PowerOracle', function () {
     const USER_ID = 4;
     beforeEach(async () => {
       await oracle.stubSetUserReward(USER_ID, ether(250));
-      await staking.mockSetUserFinancier(USER_ID, aliceFinancier)
+      await staking.mockSetUserAdmin(USER_ID, alice)
     })
 
     it('should allow a valid user withdrawing their rewards', async function() {
       expect(await oracle.rewards(USER_ID)).to.be.equal(ether(250));
 
       expect(await cvpToken.balanceOf(sink)).to.be.equal('0');
-      await oracle.withdrawRewards(USER_ID, sink, { from: aliceFinancier });
+      await oracle.withdrawRewards(USER_ID, sink, { from: alice });
       expect(await cvpToken.balanceOf(sink)).to.be.equal(ether(250));
 
       expect(await oracle.rewards(USER_ID)).to.be.equal(ether(0));
     });
 
-    it('should deny non-financier key withdrawing users rewards', async function() {
-      await expect(oracle.withdrawRewards(USER_ID, sink, { from: alice }))
-        .to.be.revertedWith('PowerOracleStaking::requireValidFinancier: Invalid financier');
+    it('should deny non-admin key withdrawing users rewards', async function() {
+      await expect(oracle.withdrawRewards(USER_ID, sink, { from: bob }))
+        .to.be.revertedWith('PowerOracleStaking::requireValidAdminKey: Invalid admin key');
     });
 
     it('should deny withdrawing to 0 address', async function() {
-      await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: aliceFinancier }))
+      await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: alice }))
         .to.be.revertedWith("PowerOracle::withdrawRewards: Can't withdraw to 0 address");
     });
   });

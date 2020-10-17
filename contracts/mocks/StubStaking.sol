@@ -19,10 +19,9 @@ contract StubStaking is PowerOracleStaking {
     _highestDeposit = highestDeposit_;
   }
 
-  function stubSetUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_, uint256 deposit_) external {
+  function stubSetUser(uint256 userId_, address adminKey_, address pokerKey_, uint256 deposit_) external {
     users[userId_].adminKey = adminKey_;
     users[userId_].pokerKey = pokerKey_;
-    users[userId_].financierKey = financierKey_;
     users[userId_].deposit = deposit_;
   }
 

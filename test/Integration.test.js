@@ -30,10 +30,10 @@ describe('IntegrationTest', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, charlierReporter, charlieFinancier;
+  let deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, bobPoker, charlieReporter;
 
   before(async function() {
-    [deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, aliceFinancier, bobPoker, bobFinancier, charlierReporter, charlieFinancier] = await web3.eth.getAccounts();
+    [deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, bobPoker, charlieReporter] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
@@ -61,22 +61,22 @@ describe('IntegrationTest', function () {
 
     // Distribute funds...
     await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
-    await cvpToken.transfer(aliceFinancier, ether(1000), { from: deployer });
-    await cvpToken.transfer(bobFinancier, ether(1000), { from: deployer });
-    await cvpToken.transfer(charlieFinancier, ether(1000), { from: deployer });
+    await cvpToken.transfer(alice, ether(1000), { from: deployer });
+    await cvpToken.transfer(bob, ether(1000), { from: deployer });
+    await cvpToken.transfer(charlie, ether(1000), { from: deployer });
 
     // Approve funds...
     await cvpToken.approve(oracle.address, ether(100000), { from: reservoir });
-    await cvpToken.approve(staking.address, ether(100), { from: aliceFinancier });
-    await cvpToken.approve(staking.address, ether(100), { from: bobFinancier });
-    await cvpToken.approve(staking.address, ether(100), { from: charlieFinancier });
+    await cvpToken.approve(staking.address, ether(100), { from: alice });
+    await cvpToken.approve(staking.address, ether(100), { from: bob });
+    await cvpToken.approve(staking.address, ether(100), { from: charlie });
 
     // Register
-    let res = await staking.createUser(alice, alicePoker, aliceFinancier, 0, { from: bob });
+    let res = await staking.createUser(alice, alicePoker, 0, { from: bob });
     const aliceId = getEventArg(res, 'CreateUser', 'userId');
-    res = await staking.createUser(bob, bobPoker, bobFinancier, 0, { from: alice });
+    res = await staking.createUser(bob, bobPoker, 0, { from: alice });
     const bobId = getEventArg(res, 'CreateUser', 'userId');
-    res = await staking.createUser(charlie, charlierReporter, charlieFinancier, 0, { from: charlie });
+    res = await staking.createUser(charlie, charlieReporter, 0, { from: charlie });
     const charlieId = getEventArg(res, 'CreateUser', 'userId');
 
     expect(aliceId).to.be.equal('1');
@@ -84,9 +84,9 @@ describe('IntegrationTest', function () {
     expect(charlieId).to.be.equal('3');
 
     // Deposit
-    await staking.deposit(charlieId, ether(30), { from: charlieFinancier });
-    await staking.deposit(aliceId, ether(100), { from: aliceFinancier });
-    await staking.deposit(bobId, ether(50), { from: bobFinancier });
+    await staking.deposit(charlieId, ether(30), { from: charlie });
+    await staking.deposit(aliceId, ether(100), { from: alice });
+    await staking.deposit(bobId, ether(50), { from: bob });
 
     expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(100));
     expect(await staking.getDepositOf(bobId)).to.be.equal(ether(50));
@@ -160,16 +160,14 @@ describe('IntegrationTest', function () {
     expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(40));
 
     // Withdrawing rewards
-    expect(await cvpToken.balanceOf(alice)).to.be.equal('0');
-    await oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier });
-    await expect(oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier }))
+    await oracle.withdrawRewards(aliceId, alice, { from: alice });
+    await expect(oracle.withdrawRewards(aliceId, alice, { from: alice }))
       .to.be.revertedWith('PowerOracle::withdrawRewards: Nothing to withdraw');
 
-    await cvpToken.transfer(reservoir, 4820, { from: alice });
     // Withdraw stake
-    await expect(staking.withdraw(aliceId, alice, ether(41), { from: aliceFinancier }))
+    await expect(staking.withdraw(aliceId, alice, ether(41), { from: alice }))
       .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
-    await staking.withdraw(aliceId, alicePoker, ether(40), { from: aliceFinancier });
+    await staking.withdraw(aliceId, alicePoker, ether(40), { from: alice });
     expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(40));
 
     expect(await staking.getDepositOf(aliceId)).to.be.equal('0');

@@ -281,7 +281,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param to_ The address to transfer the reward to
    */
   function withdrawRewards(uint256 userId_, address to_) external override {
-    powerOracleStaking.requireValidFinancierKey(userId_, msg.sender);
+    powerOracleStaking.requireValidAdminKey(userId_, msg.sender);
     require(to_ != address(0), "PowerOracle::withdrawRewards: Can't withdraw to 0 address");
     uint256 rewardAmount = rewards[userId_];
     require(rewardAmount > 0, "PowerOracle::withdrawRewards: Nothing to withdraw");
