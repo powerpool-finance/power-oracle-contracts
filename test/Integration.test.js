@@ -15,9 +15,6 @@ MockCVP.numberFormat = 'String';
 PowerOracleStaking.numberFormat = 'String';
 PowerOracle.numberFormat = 'String';
 
-const DAI_SYMBOL_HASH = keccak256('DAI');
-const ETH_SYMBOL_HASH = keccak256('ETH');
-const CVP_SYMBOL_HASH = keccak256('CVP');
 const REPORT_REWARD_IN_ETH = ether('0.05');
 const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = 30;
@@ -110,10 +107,7 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'RewardUser', {
       userId: '1',
       count: '2',
-      calculatedReward: '2'
     })
-
-    expect(await oracle.rewards(aliceId)).to.be.equal('2');
 
     await time.increase(40);
 
@@ -130,8 +124,6 @@ describe('IntegrationTest', function () {
       userId: '1',
     })
 
-    expect(await oracle.rewards(aliceId)).to.be.equal('2');
-
     await time.increase(65);
 
     // 3rd Poke
@@ -146,10 +138,7 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'RewardUser', {
       userId: '1',
       count: '2',
-      calculatedReward: '4818'
     })
-
-    expect(await oracle.rewards(aliceId)).to.be.equal('4820');
 
     // 4th Poke from Slasher which fails
     res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP', 'CVP'], { from: bobPoker });
@@ -175,17 +164,14 @@ describe('IntegrationTest', function () {
     await oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier });
     await expect(oracle.withdrawRewards(aliceId, alice, { from: aliceFinancier }))
       .to.be.revertedWith('PowerOracle::withdrawRewards: Nothing to withdraw');
-    expect(await cvpToken.balanceOf(alice)).to.be.equal('4820');
 
     await cvpToken.transfer(reservoir, 4820, { from: alice });
     // Withdraw stake
-    expect(await cvpToken.balanceOf(alice)).to.be.equal('0');
     await expect(staking.withdraw(aliceId, alice, ether(41), { from: aliceFinancier }))
       .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
     await staking.withdraw(aliceId, alicePoker, ether(40), { from: aliceFinancier });
     expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(40));
 
-    expect(await oracle.rewards(aliceId)).to.be.equal('0');
     expect(await staking.getDepositOf(aliceId)).to.be.equal('0');
     expect(await staking.getDepositOf(bobId)).to.be.equal(ether(95));
     expect(await staking.getDepositOf(charlieId)).to.be.equal(ether(30));

@@ -6,6 +6,7 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./interfaces/IPowerOracleStaking.sol";
@@ -16,6 +17,7 @@ import "./utils/Ownable.sol";
 
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
+  using SafeCast for uint256;
 
   uint256 public constant REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT = 100;
 
@@ -121,8 +123,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return ethPrice;
   }
 
-  function _updateCvpPrice() internal returns (uint256) {
-    uint256 cvpPrice = fetchCvpPrice();
+  function _updateCvpPrice(uint256 ethPrice) internal returns (uint256) {
+    uint256 cvpPrice = fetchCvpPrice(ethPrice);
     _savePrice("CVP", cvpPrice);
     return cvpPrice;
   }
@@ -140,8 +142,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
 
     uint256 delta = block.timestamp - prices[symbolHash].timestamp;
-    // TODO: use a safe Uint128 case
-    prices[keccak256(abi.encodePacked(symbol_))] = Price(uint128(block.timestamp), uint128(price_));
+    prices[keccak256(abi.encodePacked(symbol_))] = Price(block.timestamp.toUint128(), price_.toUint128());
 
     if (delta < minReportInterval) {
       return ReportInterval.LESS_THAN_MIN;
@@ -195,7 +196,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
 
     uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice();
+    uint256 cvpPrice = _updateCvpPrice(ethPrice);
     uint256 rewardCount = 0;
 
     for (uint256 i = 0; i < len; i++) {
@@ -264,7 +265,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
 
     uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice();
+    uint256 cvpPrice = _updateCvpPrice(ethPrice);
 
     uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
     emit RewardAddress(to_, count_, amount);
