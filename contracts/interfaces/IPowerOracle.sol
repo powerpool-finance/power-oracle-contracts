@@ -15,9 +15,6 @@ interface IPowerOracle {
   function poke(string[] memory symbols_) external;
   function withdrawRewards(uint256 userId, address to) external;
 
-  /*** PowerOracleStaking Interface ***/
-  function rewardAddress(address to, uint256 count) external;
-
   /*** Owner Interface ***/
   function setTokenReportReward(uint256 tokenReportReward) external;
   function setMaxCvpReward(uint256 maxCvpReward) external;

@@ -44,9 +44,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
   event NothingToReward(uint256 indexed userId, uint ethPrice);
 
-  /// @notice The event emitted when a powerOracleStaking asks to reward particular address
-  event RewardAddress(address indexed to, uint256 count, uint256 amount);
-
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint price);
 
@@ -255,29 +252,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
 
     emit Poke(msg.sender, len);
-  }
-
-  /*** PowerOracleStaking Interface ***/
-
-  /**
-   * @notice PowerOracleStaking rewards the given address the same way as reporter receives poke rewards
-   * @param to_ The address to reward
-   * @param count_ Multiplier to multiply the basic reward which equals to poke a single token reward
-   */
-  function rewardAddress(address to_, uint256 count_) external override virtual {
-    require(msg.sender == address(powerOracleStaking), "PowerOracle::rewardUser: Only Staking contract allowed");
-    require(count_ < REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT, "PowerOracle::rewardUser: Count has a hard limit of 100");
-    require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
-
-    uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice(ethPrice);
-
-    uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
-    emit RewardAddress(to_, count_, amount);
-
-    if (amount > 0) {
-      cvpToken.transferFrom(reservoir, to_, amount);
-    }
   }
 
   /**

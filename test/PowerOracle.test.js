@@ -495,39 +495,6 @@ describe('PowerOracle', function () {
     });
   });
 
-  describe('rewardAddress', () => {
-    beforeEach(async () => {
-      await oracle.setPowerOracleStaking(bob, { from: owner });
-      await oracle.poke(['CVP', 'ETH']);
-      await time.increase(120);
-    })
-
-    it('should allow the powerOracleStaking contract rewarding any address', async function() {
-      const res = await oracle.rewardAddress(sink, 3, { from: bob });
-      expectEvent(res, 'RewardAddress', {
-        to: sink,
-        count: '3',
-        amount: '13170731706'
-      })
-      expect(await cvpToken.balanceOf(sink)).to.be.equal('13170731706');
-    });
-
-    it('should deny non-powerOracleStaking contract rewarding any address', async function() {
-      await expect(oracle.rewardAddress(sink, 3, { from: alice }))
-        .to.be.revertedWith('PowerOracle::rewardUser: Only Staking contract allowed');
-    });
-
-    it('should deny rewarding with 0 count', async function() {
-      await expect(oracle.rewardAddress(sink, 0, { from: bob }))
-        .to.be.revertedWith('PowerOracle::rewardUser: Count should be positive');
-    });
-
-    it('should deny rewarding with more than 100 count', async function() {
-      await expect(oracle.rewardAddress(sink, 101, { from: bob }))
-        .to.be.revertedWith('PowerOracle::rewardUser: Count has a hard limit of 100');
-    });
-  });
-
   describe('owner methods', () => {
     describe('setReportReward', () => {
       it('should allow the owner setting a new report reward', async function() {

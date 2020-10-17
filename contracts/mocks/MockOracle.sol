@@ -24,11 +24,6 @@ contract MockOracle is PowerOracle {
     prices[symbolHash_] = Price(uint128(block.timestamp), value_);
   }
 
-  event MockRewardAddress(address to, uint256 count);
-  function rewardAddress(address to_, uint256 count_) external override(PowerOracle) {
-    emit MockRewardAddress(to_, count_);
-  }
-
   event MockFetchMockedAnchorPrice(string symbol);
   function fetchAnchorPrice(string memory symbol, TokenConfig memory config, uint conversionFactor) internal override returns (uint) {
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol));

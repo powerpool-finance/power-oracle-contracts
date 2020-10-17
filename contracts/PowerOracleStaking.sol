@@ -348,8 +348,6 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
 
     _highestDeposit = candidateDeposit;
     _reporterId = candidateId_;
-
-    IPowerOracle(powerOracle).rewardAddress(msg.sender, setUserRewardCount);
   }
 
   /*** Viewers ***/
