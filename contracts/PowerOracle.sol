@@ -133,7 +133,12 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     TokenConfig memory config = getTokenConfigBySymbol(symbol_);
     require(config.priceSource == PriceSource.REPORTER, "only reporter prices get posted");
 
-    uint256 price = fetchAnchorPrice(symbol_, config, ethPrice_);
+    uint256 price;
+    if (keccak256(abi.encodePacked(symbol_)) == ethHash) {
+      price = ethPrice_;
+    } else {
+      fetchAnchorPrice(symbol_, config, ethPrice_);
+    }
 
     return _savePrice(symbol_, price);
   }
