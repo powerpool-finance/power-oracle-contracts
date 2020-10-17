@@ -12,8 +12,8 @@ interface IPowerOracleStaking {
   /*** User Interface ***/
   function deposit(uint256 userId_, uint256 amount_) external;
   function withdraw(uint256 userId_, address to_, uint256 amount_) external;
-  function createUser(address adminKey_, address reporterKey_, address financierKey_, uint256 depositAmount) external;
-  function updateUser(uint256 userId, address adminKey_, address reporterKey_, address financierKey_) external;
+  function createUser(address adminKey_, address reporterKey_, uint256 depositAmount) external;
+  function updateUser(uint256 userId, address adminKey_, address reporterKey_) external;
 
   /*** Owner Interface ***/
   function withdrawExtraCVP(address to) external;
@@ -36,5 +36,5 @@ interface IPowerOracleStaking {
   function getUserStatus(uint256 userId_, address reporterKey_) external view returns (UserStatus);
   function authorizeReporter(uint256 userId_, address reporterKey_) external view;
   function authorizeSlasher(uint256 userId_, address reporterKey_) external view;
-  function requireValidFinancierKey(uint256 userId_, address financier_) external view;
+  function requireValidAdminKey(uint256 userId_, address adminKey_) external view;
 }
