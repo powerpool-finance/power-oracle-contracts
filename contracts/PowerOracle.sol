@@ -121,8 +121,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return ethPrice;
   }
 
-  function _updateCvpPrice() internal returns (uint256) {
-    uint256 cvpPrice = fetchCvpPrice();
+  function _updateCvpPrice(uint256 ethPrice) internal returns (uint256) {
+    uint256 cvpPrice = fetchCvpPrice(ethPrice);
     _savePrice("CVP", cvpPrice);
     return cvpPrice;
   }
@@ -195,7 +195,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
 
     uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice();
+    uint256 cvpPrice = _updateCvpPrice(ethPrice);
     uint256 rewardCount = 0;
 
     for (uint256 i = 0; i < len; i++) {
@@ -264,7 +264,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
 
     uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice();
+    uint256 cvpPrice = _updateCvpPrice(ethPrice);
 
     uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
     emit RewardAddress(to_, count_, amount);

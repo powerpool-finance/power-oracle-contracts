@@ -8,6 +8,7 @@ const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
 const MockStaking = artifacts.require('MockStaking');
 const StubOracle = artifacts.require('StubOracle');
+const MockOracle = artifacts.require('MockOracle');
 
 chai.use(solidity);
 const { expect } = chai;
@@ -15,11 +16,12 @@ const { expect } = chai;
 MockCVP.numberFormat = 'String';
 MockStaking.numberFormat = 'String';
 StubOracle.numberFormat = 'String';
+MockOracle.numberFormat = 'String';
 
 const ETH_SYMBOL_HASH = keccak256('ETH');
 const CVP_SYMBOL_HASH = keccak256('CVP');
 const USDT_SYMBOL_HASH = keccak256('USDT');
-const REPORT_REWARD_IN_ETH = ether('0.05');
+const REPORT_REWARD_IN_ETH = ether('0.02');
 const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = '45';
 const MIN_REPORT_INTERVAL = '30';
@@ -34,6 +36,15 @@ function expectPriceUpdateEvent(config) {
       symbol: symbol,
       oldTimestamp,
       newTimestamp
+    });
+  })
+}
+
+function expectMockedPriceUpdateEvent(config) {
+  const { response, tokenSymbols } = config;
+  tokenSymbols.forEach(symbol => {
+    expectEvent(response, 'MockFetchMockedAnchorPrice', {
+      symbol: symbol
     });
   })
 }
@@ -118,15 +129,26 @@ describe('PowerOracle', function () {
     });
 
     describe('rewards', () => {
+      beforeEach(async function() {
+        oracle = await deployProxied(
+          MockOracle,
+          [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+          [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+          { proxyAdminOwner: owner }
+        );
+        await staking.setPowerOracle(oracle.address, { from: deployer });
+        await oracle.mockSetAnchorPrice('ETH', mwei('320'));
+        await oracle.mockSetAnchorPrice('CVP', mwei('2.5'));
+        // NOTICE: so the 1 token reward is `1 (count) * 0.02 (reward in ETH) * 320 (ETH price) / 2.5 (CVP price) `
+        // which equals to `2.56 CVP`
+      })
+
       it('should not reward a reporter for reporting CVP and ETH', async function() {
         const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporterPoker });
-        const resTimestamp = await getResTimestamp(res);
 
-        expectPriceUpdateEvent({
+        expectMockedPriceUpdateEvent({
           response: res,
           tokenSymbols: ['ETH', 'CVP'],
-          oldTimestamp: '0',
-          newTimestamp: resTimestamp
         });
 
         expectEvent(res, 'PokeFromReporter', {
@@ -143,13 +165,16 @@ describe('PowerOracle', function () {
         const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporterPoker });
         const resTimestamp = await getResTimestamp(res);
 
+        expectMockedPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP'],
+        });
         expectPriceUpdateEvent({
           response: res,
-          tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI'],
+          tokenSymbols: ['REP', 'DAI'],
           oldTimestamp: '0',
           newTimestamp: resTimestamp
         });
-
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '2',
@@ -158,7 +183,7 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '2',
-          calculatedReward: '2'
+          calculatedReward: ether('5.12')
         });
       });
 
@@ -168,15 +193,18 @@ describe('PowerOracle', function () {
         const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
         const resTimestamp = await getResTimestamp(res);
 
-        expect(await oracle.rewards(1)).to.be.equal('1');
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.56'));
 
+        expectMockedPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP'],
+        });
         expectPriceUpdateEvent({
           response: res,
-          tokenSymbols: ['ETH', 'CVP', 'REP'],
+          tokenSymbols: ['REP'],
           oldTimestamp: '0',
           newTimestamp: resTimestamp
         })
-
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '2',
@@ -185,20 +213,20 @@ describe('PowerOracle', function () {
         expectEvent(res, 'NothingToReward', {
           userId: '1',
         });
-        expect(await oracle.rewards(1)).to.be.equal('1');
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.56'));
       });
 
       it('should partially update on partially outdated prices', async function() {
         // 1st poke
         let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const firstTimestamp = await getResTimestamp(res);
-        expect(await oracle.rewards(1)).to.be.equal('3');
+        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
         res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
-        expect(await oracle.rewards(1)).to.be.equal('3');
+        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
         await time.increase(20);
 
         // 3rd poke
@@ -206,14 +234,19 @@ describe('PowerOracle', function () {
         const thirdTimestamp = await getResTimestamp(res);
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
+        // 19.2 + 12.8
+        expect(await oracle.rewards(1)).to.be.equal(ether('12.8'));
 
+        expectMockedPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP'],
+        });
         expectPriceUpdateEvent({
           response: res,
-          tokenSymbols: ['CVP', 'REP', 'DAI', 'BTC'],
+          tokenSymbols: ['REP', 'DAI', 'BTC'],
           oldTimestamp: firstTimestamp,
           newTimestamp: thirdTimestamp
         })
-
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '3',
@@ -222,7 +255,7 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '2',
-          calculatedReward: '4818'
+          calculatedReward: ether('5.12')
         });
       });
 
@@ -230,13 +263,13 @@ describe('PowerOracle', function () {
         // 1st poke
         let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
         const firstTimestamp = await getResTimestamp(res);
-        expect(await oracle.rewards(1)).to.be.equal('3');
+        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
         res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
-        expect(await oracle.rewards(1)).to.be.equal('3');
+        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
         // NOTICE: the only difference with the example above
         await time.increase(120);
 
@@ -246,13 +279,16 @@ describe('PowerOracle', function () {
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
 
+        expectMockedPriceUpdateEvent({
+          response: res,
+          tokenSymbols: ['ETH', 'CVP'],
+        });
         expectPriceUpdateEvent({
           response: res,
-          tokenSymbols: ['CVP', 'REP', 'DAI', 'BTC'],
+          tokenSymbols: ['REP', 'DAI', 'BTC'],
           oldTimestamp: firstTimestamp,
           newTimestamp: thirdTimestamp
         })
-
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '3',
@@ -261,7 +297,7 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '3',
-          calculatedReward: '7227'
+          calculatedReward: ether('7.68')
         });
       });
     });
@@ -467,9 +503,9 @@ describe('PowerOracle', function () {
       expectEvent(res, 'RewardAddress', {
         to: sink,
         count: '3',
-        amount: '7227'
+        amount: '13170731706'
       })
-      expect(await cvpToken.balanceOf(sink)).to.be.equal('7227');
+      expect(await cvpToken.balanceOf(sink)).to.be.equal('13170731706');
     });
 
     it('should deny non-powerOracleStaking contract rewarding any address', async function() {
@@ -608,10 +644,6 @@ describe('PowerOracle', function () {
     });
 
     describe('calculateReward', () => {
-      beforeEach(async () => {
-        await oracle.setTokenReportReward(ether('0.02'), { from: owner })
-      });
-
       it('should correctly calculate a reward', async () => {
         expect(await oracle.calculateReward(3, String(320e18), String(5e18))).to.be.equal(ether('3.84'));
         expect(await oracle.calculateReward(3, String(320e18), String(2.5e18))).to.be.equal(ether('7.68'));

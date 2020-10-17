@@ -87,8 +87,8 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
     return fetchAnchorPrice("ETH", getTokenConfigBySymbolHash(ethHash), ethBaseUnit);
   }
 
-  function fetchCvpPrice() internal returns (uint) {
-    return fetchAnchorPrice("CVP", getTokenConfigBySymbolHash(cvpHash), ethBaseUnit);
+  function fetchCvpPrice(uint256 ethPrice) internal returns (uint) {
+    return fetchAnchorPrice("CVP", getTokenConfigBySymbolHash(cvpHash), ethPrice);
   }
 
   /**

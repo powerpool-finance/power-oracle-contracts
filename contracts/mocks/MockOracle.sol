@@ -14,6 +14,7 @@ contract MockOracle is PowerOracle {
     TokenConfig[] memory configs_
   ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {
   }
+  mapping(bytes32 => uint256) public mockedAnchorPrices;
 
   function mockSetUserReward(uint256 userId_, uint256 reward_) external {
     rewards[userId_] = reward_;
@@ -26,5 +27,20 @@ contract MockOracle is PowerOracle {
   event MockRewardAddress(address to, uint256 count);
   function rewardAddress(address to_, uint256 count_) external override(PowerOracle) {
     emit MockRewardAddress(to_, count_);
+  }
+
+  event MockFetchMockedAnchorPrice(string symbol);
+  function fetchAnchorPrice(string memory symbol, TokenConfig memory config, uint conversionFactor) internal override returns (uint) {
+    bytes32 symbolHash = keccak256(abi.encodePacked(symbol));
+    if (mockedAnchorPrices[symbolHash] > 0) {
+      emit MockFetchMockedAnchorPrice(symbol);
+      return mockedAnchorPrices[symbolHash];
+    } else {
+      return super.fetchAnchorPrice(symbol, config, conversionFactor);
+    }
+  }
+
+  function mockSetAnchorPrice(string memory symbol, uint256 value) external {
+    mockedAnchorPrices[keccak256(abi.encodePacked(symbol))] = value;
   }
 }
