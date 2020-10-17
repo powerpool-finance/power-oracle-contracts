@@ -143,6 +143,12 @@ describe('PowerOracle', function () {
         // which equals to `2.56 CVP`
       })
 
+      it('should assign ETH/CVP prices correctly', async function() {
+        await oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker });
+        expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('320'))
+        expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('2.5'))
+      });
+
       it('should not reward a reporter for reporting CVP and ETH', async function() {
         const res = await oracle.pokeFromReporter(1, ['CVP', 'ETH'], { from: validReporterPoker });
 
@@ -492,8 +498,6 @@ describe('PowerOracle', function () {
   describe('rewardAddress', () => {
     beforeEach(async () => {
       await oracle.setPowerOracleStaking(bob, { from: owner });
-      await oracle.stubSetPrice(CVP_SYMBOL_HASH, String(5e18));
-      await oracle.stubSetPrice(ETH_SYMBOL_HASH, String(320e18));
       await oracle.poke(['CVP', 'ETH']);
       await time.increase(120);
     })
