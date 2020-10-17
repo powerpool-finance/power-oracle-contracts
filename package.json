@@ -1,13 +1,13 @@
 {
   "name": "@powerpool/power-oracle",
-  "description": "",
+  "description": "Power Oracle is a decentralized cross-chain price oracle working on Ethereum Main Network and sidechains.",
   "version": "1.0.0",
   "author": {
     "name": "PowerPool",
     "url": "https://powerpool.finance"
   },
   "bugs": {
-    "url": "https://github.com/powerpool-finance/power-oracle/issues"
+    "url": "https://github.com/powerpool-finance/power-oracle-contracts/issues"
   },
   "devDependencies": {
     "@ethersproject/abstract-signer": "^5.0.1",
@@ -42,7 +42,7 @@
   "files": [
     "/contracts"
   ],
-  "homepage": "https://github.com/powerpool-finance/power-oracle#readme",
+  "homepage": "https://github.com/powerpool-finance/power-oracle-contracts#readme",
   "keywords": [
     "blockchain",
     "ethereum",
@@ -55,7 +55,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/powerpool-finance/powerpool-governance"
+    "url": "https://github.com/powerpool-finance/power-oracle-contracts"
   },
   "scripts": {
     "build": "yarn run compile && yarn run typechain",
