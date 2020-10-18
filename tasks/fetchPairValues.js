@@ -1,4 +1,4 @@
-// const MockUniswapTokenPair =
+/* global usePlugin, task */
 usePlugin('@nomiclabs/buidler-truffle5');
 
 task('pair-details', "Prints an account's balance")

@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied, getEventArg, keccak256 } = require('./helpers');
+const { ether, deployProxied, getEventArg } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 const { solidity } = require('ethereum-waffle');
 
@@ -30,10 +30,10 @@ describe('IntegrationTest', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, bobPoker, charlieReporter;
+  let deployer, owner, reservoir, alice, bob, charlie, alicePoker, bobPoker, charlieReporter;
 
   before(async function() {
-    [deployer, owner, timelockStub, reservoir, sourceStub1, sourceStub2, powerOracle, alice, bob, charlie, alicePoker, bobPoker, charlieReporter] = await web3.eth.getAccounts();
+    [deployer, owner, reservoir, alice, bob, charlie, alicePoker, bobPoker, charlieReporter] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {

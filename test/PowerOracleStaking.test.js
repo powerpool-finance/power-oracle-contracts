@@ -1,5 +1,5 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied } = require('./helpers');
+const { constants, expectEvent } = require('@openzeppelin/test-helpers');
+const { ether, deployProxied } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -424,32 +424,6 @@ describe('PowerOracleStaking', function () {
       await staking.setReporter(2);
       expect(await staking.getReporterId()).to.be.equal('2');
       expect(await staking.getHighestDeposit()).to.be.equal(ether(200));
-    });
-
-    it('should reward a setter', async function() {
-      await staking.stubSetUser(1, alice, alicePoker, ether(100), { from: bob });
-      await staking.stubSetUser(2, bob, bobPoker, ether(200), { from: bob });
-
-      await staking.stubSetReporter(1, ether(300));
-
-      expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
-      const res = await staking.setReporter(2, { from: charlie });
-      expectEvent(res, 'SetReporter', {
-        reporterId: '2',
-        msgSender: charlie
-      })
-      expectEvent(res, 'ReporterChange', {
-        prevId: '1',
-        nextId: '2',
-        highestDepositPrev: ether(300),
-        actualDepositPrev: ether(100),
-        actualDepositNext: ether(200)
-      })
-      expectEvent.inTransaction(res.tx, MockOracle, 'MockRewardAddress', {
-        to: charlie,
-        count: '3'
-      })
-      expect(await cvpToken.balanceOf(charlie)).to.be.equal('0');
     });
 
     it('should deny setting reporter with not the highest deposit', async function() {
