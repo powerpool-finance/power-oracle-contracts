@@ -140,7 +140,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     if (keccak256(abi.encodePacked(symbol_)) == ethHash) {
       price = ethPrice_;
     } else {
-      fetchAnchorPrice(symbol_, config, ethPrice_);
+      price = fetchAnchorPrice(symbol_, config, ethPrice_);
     }
 
     return _savePrice(symbol_, price);
