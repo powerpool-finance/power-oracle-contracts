@@ -23,7 +23,6 @@ const MAX_REPORT_INTERVAL = 90;
 const MIN_SLASHING_DEPOSIT = ether(40);
 const SLASHER_REWARD_PCT = ether(15);
 const RESERVOIR_REWARD_PCT = ether(5);
-const SET_USER_REWARD_COUNT = 3;
 
 describe('IntegrationTest', function () {
   let staking;
@@ -44,7 +43,7 @@ describe('IntegrationTest', function () {
     staking = await deployProxied(
       PowerOracleStaking,
       [cvpToken.address, reservoir],
-      [owner, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, SET_USER_REWARD_COUNT],
+      [owner, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
       { proxyAdminOwner: owner }
       );
 
