@@ -1,3 +1,4 @@
+/* global usePlugin, task */
 const fs = require('fs');
 const pIteration = require('p-iteration');
 

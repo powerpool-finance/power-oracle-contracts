@@ -14,7 +14,6 @@ import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
 
-
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
   using SafeCast for uint256;
@@ -35,20 +34,24 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The event emitted when an arbitrary user calls poke operation
   event Poke(address indexed poker, uint256 tokenCount);
 
-  /// @notice The event emitted when a reporter receives their reward for the report or an arbitrary user updates the current reporter address
-  event RewardUser(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint calculatedReward);
+  /// @notice The event emitted when a reporter receives their reward for the report
+  event RewardUser(uint256 indexed userId, uint256 count, uint256 ethPrice, uint256 cvpPrice, uint256 calculatedReward);
 
   /// @notice The event emitted when a reporter is not eligible for a reward or rewards are disabled
-  event RewardIgnored(uint256 indexed userId, uint count, uint ethPrice, uint cvpPrice, uint256 calculatedReward, uint maxCvpReward);
+  event RewardIgnored(
+    uint256 indexed userId,
+    uint256 count,
+    uint256 ethPrice,
+    uint256 cvpPrice,
+    uint256 calculatedReward,
+    uint256 maxCvpReward
+  );
 
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
-  event NothingToReward(uint256 indexed userId, uint ethPrice);
-
-  /// @notice The event emitted when a powerOracleStaking asks to reward particular address
-  event RewardAddress(address indexed to, uint256 count, uint256 amount);
+  event NothingToReward(uint256 indexed userId, uint256 ethPrice);
 
   /// @notice The event emitted when the stored price is updated
-  event PriceUpdated(string symbol, uint price);
+  event PriceUpdated(string symbol, uint256 price);
 
   /// @notice The event emitted when the owner updates reportReward value
   event SetReportReward(uint256 reportReward);
@@ -123,17 +126,22 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return ethPrice;
   }
 
-  function _updateCvpPrice(uint256 ethPrice) internal returns (uint256) {
-    uint256 cvpPrice = fetchCvpPrice(ethPrice);
+  function _updateCvpPrice(uint256 ethPrice_) internal returns (uint256) {
+    uint256 cvpPrice = fetchCvpPrice(ethPrice_);
     _savePrice("CVP", cvpPrice);
     return cvpPrice;
   }
 
-  function _fetchAndSavePrice(string memory symbol_, uint ethPrice_) internal returns (ReportInterval) {
+  function _fetchAndSavePrice(string memory symbol_, uint256 ethPrice_) internal returns (ReportInterval) {
     TokenConfig memory config = getTokenConfigBySymbol(symbol_);
     require(config.priceSource == PriceSource.REPORTER, "only reporter prices get posted");
 
-    uint256 price = fetchAnchorPrice(symbol_, config, ethPrice_);
+    uint256 price;
+    if (keccak256(abi.encodePacked(symbol_)) == ethHash) {
+      price = ethPrice_;
+    } else {
+      fetchAnchorPrice(symbol_, config, ethPrice_);
+    }
 
     return _savePrice(symbol_, price);
   }
@@ -155,7 +163,12 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return ReportInterval.GREATER_THAN_MAX;
   }
 
-  function _rewardUser(uint256 userId_, uint256 count_, uint256 ethPrice_, uint256 cvpPrice_) internal {
+  function _rewardUser(
+    uint256 userId_,
+    uint256 count_,
+    uint256 ethPrice_,
+    uint256 cvpPrice_
+  ) internal {
     if (count_ == 0) {
       emit NothingToReward(userId_, ethPrice_);
       return;
@@ -171,11 +184,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
   }
 
-  function priceInternal(TokenConfig memory config_) internal view returns (uint) {
+  function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
     if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
     if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
     if (config_.priceSource == PriceSource.FIXED_ETH) {
-      uint usdPerEth = prices[ethHash].value;
+      uint256 usdPerEth = prices[ethHash].value;
       require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
       return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
     }
@@ -252,36 +265,13 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     emit Poke(msg.sender, len);
   }
 
-  /*** PowerOracleStaking Interface ***/
-
-  /**
-   * @notice PowerOracleStaking rewards the given address the same way as reporter receives poke rewards
-   * @param to_ The address to reward
-   * @param count_ Multiplier to multiply the basic reward which equals to poke a single token reward
-   */
-  function rewardAddress(address to_, uint256 count_) external override virtual {
-    require(msg.sender == address(powerOracleStaking), "PowerOracle::rewardUser: Only Staking contract allowed");
-    require(count_ < REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT, "PowerOracle::rewardUser: Count has a hard limit of 100");
-    require(count_ > 0, "PowerOracle::rewardUser: Count should be positive");
-
-    uint256 ethPrice = _updateEthPrice();
-    uint256 cvpPrice = _updateCvpPrice(ethPrice);
-
-    uint256 amount = calculateReward(count_, ethPrice, cvpPrice);
-    emit RewardAddress(to_, count_, amount);
-
-    if (amount > 0) {
-      cvpToken.transferFrom(reservoir, to_, amount);
-    }
-  }
-
   /**
    * @notice Withdraw the available rewards
    * @param userId_ The user ID to withdraw the reward for
    * @param to_ The address to transfer the reward to
    */
   function withdrawRewards(uint256 userId_, address to_) external override {
-    powerOracleStaking.requireValidFinancierKey(userId_, msg.sender);
+    powerOracleStaking.requireValidAdminKey(userId_, msg.sender);
     require(to_ != address(0), "PowerOracle::withdrawRewards: Can't withdraw to 0 address");
     uint256 rewardAmount = rewards[userId_];
     require(rewardAmount > 0, "PowerOracle::withdrawRewards: Nothing to withdraw");
@@ -345,7 +335,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   /*** Viewers ***/
 
-  function calculateReward(uint256 count_, uint256 ethPrice_, uint256 cvpPrice_) public view returns(uint) {
+  function calculateReward(
+    uint256 count_,
+    uint256 ethPrice_,
+    uint256 cvpPrice_
+  ) public view returns (uint256) {
     if (count_ == 0) {
       return 0;
     }
@@ -355,7 +349,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     require(tokenReportReward > 0, "calculateReward: ethReward is 0");
 
     // return count * cvpReward * ethPrice / cvpPrice
-    uint singleTokenCvpReward = mul(tokenReportReward, ethPrice_) / cvpPrice_;
+    uint256 singleTokenCvpReward = mul(tokenReportReward, ethPrice_) / cvpPrice_;
 
     return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
   }
@@ -365,7 +359,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param token_ The token address for price retrieval
    * @return Price denominated in USD, with 6 decimals, for the given asset address
    */
-  function getPriceByAsset(address token_) external view override returns (uint) {
+  function getPriceByAsset(address token_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigByUnderlying(token_);
     return priceInternal(config);
   }
@@ -397,7 +391,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param cToken_ The cToken address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given cToken address
    */
-  function getUnderlyingPrice(address cToken_) external view override returns (uint) {
+  function getUnderlyingPrice(address cToken_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigByCToken(cToken_);
     // Comptroller needs prices in the format: ${raw price} * 1e(36 - baseUnit)
     // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
@@ -410,7 +404,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param token_ The underlying address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given underlying address
    */
-  function assetPrices(address token_) external view override returns (uint) {
+  function assetPrices(address token_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigByUnderlying(token_);
     // Return price in the same format as getUnderlyingPrice, but by token address
     return mul(1e30, priceInternal(config)) / config.baseUnit;

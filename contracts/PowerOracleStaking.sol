@@ -16,19 +16,31 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   uint256 public constant HUNDRED_PCT = 100 ether;
 
   /// @notice The event emitted when a new user is created
-  event CreateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey, uint256 initialDeposit);
+  event CreateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, uint256 initialDeposit);
 
   /// @notice The event emitted when an existing user is updated
-  event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey, address financierKey);
+  event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey);
 
   /// @notice The event emitted when an existing user is updated
   event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
 
-  /// @notice The event emitted when a valid financier key withdraws funds deposited for the given user ID
-  event Withdraw(uint256 indexed userId, address indexed financier, address indexed to, uint256 amount, uint256 depositAfter);
+  /// @notice The event emitted when a valid admin key withdraws funds deposited for the given user ID
+  event Withdraw(
+    uint256 indexed userId,
+    address indexed adminKey,
+    address indexed to,
+    uint256 amount,
+    uint256 depositAfter
+  );
 
   /// @notice The event emitted when the owner withdraws the extra CVP amount from the contract
-  event WithdrawExtraCVP(bool indexed sent, address indexed to, uint256 diff, uint256 erc20Balance, uint256 accountedTotalDeposits);
+  event WithdrawExtraCVP(
+    bool indexed sent,
+    address indexed to,
+    uint256 diff,
+    uint256 erc20Balance,
+    uint256 accountedTotalDeposits
+  );
 
   /// @notice The event emitted when the owner sets a new minimal slashing deposit value
   event SetMinimalSlashingDeposit(uint256 amount);
@@ -43,7 +55,13 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   event SetReporter(uint256 indexed reporterId, address indexed msgSender);
 
   /// @notice The event emitted when the PowerOracle contract requests to slash a user with the given ID
-  event Slash(uint256 indexed slasherId, uint256 indexed reporterId, uint256 indexed overdueCount, uint256 slasherReward, uint256 reservoirReward);
+  event Slash(
+    uint256 indexed slasherId,
+    uint256 indexed reporterId,
+    uint256 indexed overdueCount,
+    uint256 slasherReward,
+    uint256 reservoirReward
+  );
 
   /// @notice The event emitted when the existing reporter is replaced with a new one due some reason
   event ReporterChange(
@@ -57,7 +75,6 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   struct User {
     address adminKey;
     address pokerKey;
-    address financierKey;
     uint256 deposit;
   }
 
@@ -82,9 +99,6 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   /// @notice The share of the protocol(reservoir) in slashed deposit per one outdated asset (1 eth == 1%)
   uint256 public protocolSlashingRewardPct;
 
-  /// @notice The count value to pass in the powerOracle contract when a user is rewarded for updating an outdated reporter ID
-  uint256 public setUserRewardCount;
-
   /// @notice The incremented user ID counter. Is updated only within createUser function call
   uint256 public userIdCounter;
 
@@ -107,15 +121,13 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     address powerOracle_,
     uint256 minimalSlashingDeposit_,
     uint256 slasherRewardPct_,
-    uint256 reservoirSlashingRewardPct_,
-    uint256 setUserRewardCount_
+    uint256 reservoirSlashingRewardPct_
   ) public initializer {
     _transferOwnership(owner_);
     powerOracle = powerOracle_;
     minimalSlashingDeposit = minimalSlashingDeposit_;
     slasherSlashingRewardPct = slasherRewardPct_;
     protocolSlashingRewardPct = reservoirSlashingRewardPct_;
-    setUserRewardCount = setUserRewardCount_;
   }
 
   /*** User Interface ***/
@@ -150,7 +162,13 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     uint256 prevDeposit = users[prevReporterId].deposit;
 
     if (candidateDepositAfter_ > prevDeposit && prevReporterId != candidateId_) {
-      emit ReporterChange(prevReporterId, candidateId_, _highestDeposit, users[prevReporterId].deposit, candidateDepositAfter_);
+      emit ReporterChange(
+        prevReporterId,
+        candidateId_,
+        _highestDeposit,
+        users[prevReporterId].deposit,
+        candidateDepositAfter_
+      );
 
       _highestDeposit = candidateDepositAfter_;
       _reporterId = candidateId_;
@@ -158,17 +176,21 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   }
 
   /**
-   * @notice A valid users financier key withdraws the deposited stake form the contract
+   * @notice A valid users admin key withdraws the deposited stake form the contract
    * @param userId_ The user ID to withdraw deposit from
    * @param to_ The address to send the CVP tokens to
    * @param amount_ The amount in CVP tokens to withdraw
    */
-  function withdraw(uint256 userId_, address to_, uint256 amount_) external override {
+  function withdraw(
+    uint256 userId_,
+    address to_,
+    uint256 amount_
+  ) external override {
     require(amount_ > 0, "PowerOracleStaking::withdraw: Missing amount");
     require(to_ != address(0), "PowerOracleStaking::withdraw: Can't transfer to 0 address");
 
     User storage user = users[userId_];
-    require(msg.sender == user.financierKey, "PowerOracleStaking::withdraw: Only user's financier key allowed");
+    require(msg.sender == user.adminKey, "PowerOracleStaking::withdraw: Only user's admin key allowed");
 
     uint256 depositBefore = user.deposit;
     require(amount_ <= depositBefore, "PowerOracleStaking::withdraw: Amount exceeds deposit");
@@ -185,15 +207,18 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @notice Creates a new user ID and stores the given keys
    * @param adminKey_ The admin key for the new user
    * @param pokerKey_ The poker key for the new user
-   * @param financierKey_ The financier key for the new user
    * @param initialDeposit_ The initial deposit to be transferred to this contract
    */
-  function createUser(address adminKey_, address pokerKey_, address financierKey_, uint256 initialDeposit_) external override whenNotPaused {
+  function createUser(
+    address adminKey_,
+    address pokerKey_,
+    uint256 initialDeposit_
+  ) external override whenNotPaused {
     uint256 userId = ++userIdCounter;
 
-    users[userId] = User(adminKey_, pokerKey_, financierKey_, 0);
+    users[userId] = User(adminKey_, pokerKey_, 0);
 
-    emit CreateUser(userId, adminKey_, pokerKey_, financierKey_, initialDeposit_);
+    emit CreateUser(userId, adminKey_, pokerKey_, initialDeposit_);
 
     if (initialDeposit_ > 0) {
       _deposit(userId, initialDeposit_);
@@ -204,9 +229,12 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @notice Updates an existing user, only the current adminKey is eligible calling this method.
    * @param adminKey_ The new admin key for the user
    * @param pokerKey_ The new poker key for the user
-   * @param financierKey_ The new financier key for the user
    */
-  function updateUser(uint256 userId_, address adminKey_, address pokerKey_, address financierKey_) external override {
+  function updateUser(
+    uint256 userId_,
+    address adminKey_,
+    address pokerKey_
+  ) external override {
     User storage user = users[userId_];
     require(msg.sender == user.adminKey, "PowerOracleStaking::updateUser: Only admin allowed");
 
@@ -216,11 +244,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     if (pokerKey_ != user.pokerKey) {
       user.pokerKey = pokerKey_;
     }
-    if (financierKey_ != user.financierKey) {
-      user.financierKey = financierKey_;
-    }
 
-    emit UpdateUser(userId_, adminKey_, pokerKey_, financierKey_);
+    emit UpdateUser(userId_, adminKey_, pokerKey_);
   }
 
   /*** PowerOracle Contract Interface ***/
@@ -230,7 +255,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @param slasherId_ The slasher ID
    * @param overdueCount_ The overdue token multiplier
    */
-  function slash(uint256 slasherId_, uint256 overdueCount_) external override virtual {
+  function slash(uint256 slasherId_, uint256 overdueCount_) external virtual override {
     User storage slasher = users[slasherId_];
     require(slasher.deposit >= minimalSlashingDeposit, "PowerOracleStaking::slash: Insufficient slasher deposit");
     require(msg.sender == powerOracle, "PowerOracleStaking::slash: Only PowerOracle allowed");
@@ -311,7 +336,11 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
    * @param slasherSlashingRewardPct_ The slasher share will be accrued on the slasher's deposit
    * @param protocolSlashingRewardPct_ The protocol share will immediately be transferred to reservoir
    */
-  function setSlashingPct(uint256 slasherSlashingRewardPct_, uint256 protocolSlashingRewardPct_) external override onlyOwner {
+  function setSlashingPct(uint256 slasherSlashingRewardPct_, uint256 protocolSlashingRewardPct_)
+    external
+    override
+    onlyOwner
+  {
     require(
       slasherSlashingRewardPct_.add(protocolSlashingRewardPct_) <= HUNDRED_PCT,
       "PowerOracleStaking::setSlashingPct: Invalid reward sum"
@@ -347,15 +376,16 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     uint256 prevReporterId = _reporterId;
     uint256 currentReporterDeposit = users[prevReporterId].deposit;
 
-    require(candidateDeposit > currentReporterDeposit, "PowerOracleStaking::setReporter: Insufficient candidate deposit");
+    require(
+      candidateDeposit > currentReporterDeposit,
+      "PowerOracleStaking::setReporter: Insufficient candidate deposit"
+    );
 
     emit ReporterChange(prevReporterId, candidateId_, _highestDeposit, currentReporterDeposit, candidateDeposit);
     emit SetReporter(candidateId_, msg.sender);
 
     _highestDeposit = candidateDeposit;
     _reporterId = candidateId_;
-
-    IPowerOracle(powerOracle).rewardAddress(msg.sender, setUserRewardCount);
   }
 
   /*** Viewers ***/
@@ -388,11 +418,14 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   }
 
   function authorizeSlasher(uint256 userId_, address pokerKey_) external view override {
-    require(users[userId_].deposit >= minimalSlashingDeposit, "PowerOracleStaking::authorizeSlasher: Insufficient deposit");
+    require(
+      users[userId_].deposit >= minimalSlashingDeposit,
+      "PowerOracleStaking::authorizeSlasher: Insufficient deposit"
+    );
     require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid poker key");
   }
 
-  function requireValidFinancierKey(uint256 userId_, address financier_) external view override {
-    require(users[userId_].financierKey == financier_, "PowerOracleStaking::requireValidFinancier: Invalid financier");
+  function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
+    require(users[userId_].adminKey == adminKey_, "PowerOracleStaking::requireValidAdminKey: Invalid admin key");
   }
 }
