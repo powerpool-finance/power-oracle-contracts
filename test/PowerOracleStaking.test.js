@@ -18,7 +18,6 @@ StubStaking.numberFormat = 'String';
 const MINIMAL_SLASHING_DEPOSIT = ether(50);
 const SLASHER_SLASHING_REWARD_PCT = ether(5);
 const PROTOCOL_SLASHING_REWARD_PCT = ether('1.5');
-const SET_USER_REWARD_COUNT = 3;
 
 const USER_STATUS = {
   UNAUTHORIZED: '0',
@@ -41,7 +40,7 @@ describe('PowerOracleStaking', function () {
     staking = await deployProxied(
       StubStaking,
       [cvpToken.address, reservoir],
-      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT],
+      [owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT],
       { proxyAdminOwner: owner }
     );
   });
@@ -54,11 +53,10 @@ describe('PowerOracleStaking', function () {
       expect(await staking.minimalSlashingDeposit()).to.be.equal(MINIMAL_SLASHING_DEPOSIT);
       expect(await staking.slasherSlashingRewardPct()).to.be.equal(SLASHER_SLASHING_REWARD_PCT);
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
-      expect(await staking.setUserRewardCount()).to.be.equal(SET_USER_REWARD_COUNT.toString());
     });
 
     it('should deny initializing again', async function() {
-      await expect(staking.initialize(owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, SET_USER_REWARD_COUNT))
+      await expect(staking.initialize(owner, powerOracle, MINIMAL_SLASHING_DEPOSIT, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })
