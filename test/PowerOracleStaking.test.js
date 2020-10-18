@@ -1,5 +1,5 @@
-const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { K, ether, deployProxied } = require('./helpers');
+const { constants, expectEvent } = require('@openzeppelin/test-helpers');
+const { ether, deployProxied } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');

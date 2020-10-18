@@ -1,9 +1,9 @@
-// const MockUniswapTokenPair =
+/* global usePlugin, task */
 usePlugin('@nomiclabs/buidler-truffle5');
 
 
 task('deploy-testnet', 'Deploys testnet contracts')
-  .setAction(async (taskArgs) => {
+  .setAction(async () => {
     const { deployProxied, ether } = require('../test/helpers');
     const { getTokenConfigs } = require('../test/localHelpers');
     const { constants } = require('@openzeppelin/test-helpers');

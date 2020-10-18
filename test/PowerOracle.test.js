@@ -54,10 +54,10 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, sink;
+  let deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink;
 
   before(async function() {
-    [deployer, owner, timelockStub, sourceStub1, reservoir, powerOracle, alice, bob, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
+    [deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
