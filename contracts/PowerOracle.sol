@@ -18,7 +18,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   using SafeMath for uint256;
   using SafeCast for uint256;
 
-  uint256 public constant REWARD_USER_EXTERNAL_HARD_COUNT_LIMIT = 100;
+  uint256 public constant HUNDRED_PCT = 100 ether;
 
   struct Price {
     uint128 timestamp;
@@ -35,16 +35,23 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   event Poke(address indexed poker, uint256 tokenCount);
 
   /// @notice The event emitted when a reporter receives their reward for the report
-  event RewardUser(uint256 indexed userId, uint256 count, uint256 ethPrice, uint256 cvpPrice, uint256 calculatedReward);
+  event RewardUser(
+    uint256 indexed userId,
+    uint256 count,
+    uint256 deposit,
+    uint256 ethPrice,
+    uint256 cvpPrice,
+    uint256 calculatedReward
+  );
 
   /// @notice The event emitted when a reporter is not eligible for a reward or rewards are disabled
   event RewardIgnored(
     uint256 indexed userId,
     uint256 count,
+    uint256 deposit,
     uint256 ethPrice,
     uint256 cvpPrice,
-    uint256 calculatedReward,
-    uint256 maxCvpReward
+    uint256 calculatedReward
   );
 
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
@@ -53,17 +60,23 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The event emitted when the stored price is updated
   event PriceUpdated(string symbol, uint256 price);
 
-  /// @notice The event emitted when the owner updates reportReward value
-  event SetReportReward(uint256 reportReward);
+  /// @notice The event emitted when the owner updates the cvpAPY value
+  event SetCvpApy(uint256 cvpAPY);
 
   /// @notice The event emitted when the owner updates min/max report intervals
   event SetReportIntervals(uint256 minReportInterval, uint256 maxReportInterval);
 
-  /// @notice The event emitted when the owner updates maxCvpReward value
-  event SetMaxCvpReward(uint256 maxCvpReward);
+  /// @notice The event emitted when the owner updates the totalReportsPerYear value
+  event SetTotalReportsPerYear(uint256 totalReportsPerYear);
 
-  /// @notice The event emitted when the owner updates powerOracleStaking address
+  /// @notice The event emitted when the owner updates the powerOracleStaking address
   event SetPowerOracleStaking(address powerOracleStaking);
+
+  /// @notice The event emitted when the owner updates the gasExpensesPerAssetReport value
+  event SetGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport);
+
+  /// @notice The event emitted when the owner updates the gasPriceLimit value
+  event SetGasPriceLimit(uint256 gasPriceLimit);
 
   /// @notice CVP token address
   IERC20 public immutable cvpToken;
@@ -74,17 +87,23 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The linked PowerOracleStaking contract address
   IPowerOracleStaking public powerOracleStaking;
 
-  /// @notice The limit in CVP reward for reporting a single token
-  uint256 public maxCvpReward;
-
-  /// @notice The reward in ETH for reporting a single token
-  uint256 public tokenReportReward;
-
   /// @notice Min report interval in seconds
   uint256 public minReportInterval;
 
   /// @notice Max report interval in seconds
   uint256 public maxReportInterval;
+
+  /// @notice The planned yield from a deposit in CVP tokens
+  uint256 public cvpAPY;
+
+  /// @notice The total number of reports for all pairs per year
+  uint256 public totalReportsPerYear;
+
+  /// @notice The current estimated gas expenses for reporting a single asset
+  uint256 public gasExpensesPerAssetReport;
+
+  /// @notice The maximum gas price to be used with gas compensation formula
+  uint256 public gasPriceLimit;
 
   /// @notice The accrued reward by a user ID
   mapping(uint256 => uint256) public rewards;
@@ -105,15 +124,19 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function initialize(
     address owner_,
     address powerOracleStaking_,
-    uint256 reportReward_,
-    uint256 maxCvpReward_,
+    uint256 cvpAPY_,
+    uint256 totalReportsPerYear_,
+    uint256 gasExpensesPerAssetReport_,
+    uint256 gasPriceLimit_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
   ) external initializer {
     _transferOwnership(owner_);
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
-    tokenReportReward = reportReward_;
-    maxCvpReward = maxCvpReward_;
+    cvpAPY = cvpAPY_;
+    totalReportsPerYear = totalReportsPerYear_;
+    gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
+    gasPriceLimit = gasPriceLimit_;
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
   }
@@ -174,14 +197,19 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       return;
     }
 
-    uint256 amount = calculateReward(count_, ethPrice_, cvpPrice_);
+    uint256 userDeposit = powerOracleStaking.getDepositOf(userId_);
+    uint256 amount = calculateReward(count_, powerOracleStaking.getDepositOf(userId_), ethPrice_, cvpPrice_);
 
     if (amount > 0) {
       rewards[userId_] = rewards[userId_].add(amount);
-      emit RewardUser(userId_, count_, ethPrice_, cvpPrice_, amount);
+      emit RewardUser(userId_, count_, userDeposit, ethPrice_, cvpPrice_, amount);
     } else {
-      emit RewardIgnored(userId_, count_, ethPrice_, cvpPrice_, amount, maxCvpReward);
+      emit RewardIgnored(userId_, count_, userDeposit, ethPrice_, cvpPrice_, amount);
     }
+  }
+
+  function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+    return a < b ? a : b;
   }
 
   function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
@@ -281,22 +309,41 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   /*** Owner Interface ***/
+
   /**
-   * @notice Sets a new reportReward value
-   * @param tokenReportReward_ The single token reward in ETH
+   * @notice Set the planned yield from a deposit in CVP tokens
+   * @param cvpAPY_ The planned yield in % (1 ether == 1%)
    */
-  function setTokenReportReward(uint256 tokenReportReward_) external override onlyOwner {
-    tokenReportReward = tokenReportReward_;
-    emit SetReportReward(tokenReportReward_);
+  function setCvpAPY(uint256 cvpAPY_) external override onlyOwner {
+    cvpAPY = cvpAPY_;
+    emit SetCvpApy(cvpAPY_);
   }
 
   /**
-   * @notice The owner sets the max reward per token report in CVP tokens
-   * @param maxCvpReward_ The max token reward in CVP
+   * @notice Set the total number of reports for all pairs per year
+   * @param totalReportsPerYear_ The total number of reports
    */
-  function setMaxCvpReward(uint256 maxCvpReward_) external override onlyOwner {
-    maxCvpReward = maxCvpReward_;
-    emit SetMaxCvpReward(maxCvpReward_);
+  function setTotalReportsPerYear(uint256 totalReportsPerYear_) external override onlyOwner {
+    totalReportsPerYear = totalReportsPerYear_;
+    emit SetTotalReportsPerYear(totalReportsPerYear_);
+  }
+
+  /**
+   * @notice Set the current estimated gas expenses for reporting a single asset
+   * @param gasExpensesPerAssetReport_ The gas amount
+   */
+  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_) external override onlyOwner {
+    gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
+    emit SetGasExpensesPerAssetReport(gasExpensesPerAssetReport_);
+  }
+
+  /**
+   * @notice Set the current estimated gas expenses for reporting a single asset
+   * @param gasPriceLimit_ The gas amount
+   */
+  function setGasPriceLimit(uint256 gasPriceLimit_) external override onlyOwner {
+    gasPriceLimit = gasPriceLimit_;
+    emit SetGasPriceLimit(gasPriceLimit_);
   }
 
   /**
@@ -337,6 +384,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   function calculateReward(
     uint256 count_,
+    uint256 deposit_,
     uint256 ethPrice_,
     uint256 cvpPrice_
   ) public view returns (uint256) {
@@ -344,14 +392,21 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       return 0;
     }
 
-    require(ethPrice_ > 0, "calculateReward: ETH price is 0");
-    require(cvpPrice_ > 0, "calculateReward: CVP price is 0");
-    require(tokenReportReward > 0, "calculateReward: ethReward is 0");
+    // return count_ * (calculateFixedReward(deposit_) + calculateGasCompensation(ethPrice_, cvpPrice_));
+    return count_.mul(calculateFixedReward(deposit_).add(calculateGasCompensation(ethPrice_, cvpPrice_)));
+  }
 
-    // return count * cvpReward * ethPrice / cvpPrice
-    uint256 singleTokenCvpReward = mul(tokenReportReward, ethPrice_) / cvpPrice_;
+  function calculateFixedReward(uint256 deposit_) public view returns (uint256) {
+    // return cvpAPY * deposit_ / totalReportsPerYear / HUNDRED_PCT;
+    return cvpAPY.mul(deposit_) / totalReportsPerYear / HUNDRED_PCT;
+  }
 
-    return mul(count_, singleTokenCvpReward > maxCvpReward ? maxCvpReward : singleTokenCvpReward);
+  function calculateGasCompensation(uint256 ethPrice_, uint256 cvpPrice_) public view returns (uint256) {
+    require(ethPrice_ > 0, "PowerOracle::calculateGasCompensation: ETH price is 0");
+    require(cvpPrice_ > 0, "PowerOracle::calculateGasCompensation: CVP price is 0");
+
+    // return _min(tx.gasprice, gasPriceLimit) * gasExpensesPerAssetReport * ethPrice_ / cvpPrice_;
+    return _min(tx.gasprice, gasPriceLimit).mul(gasExpensesPerAssetReport).mul(ethPrice_) / cvpPrice_;
   }
 
   /**

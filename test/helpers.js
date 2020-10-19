@@ -85,6 +85,10 @@ function mwei(value) {
   return web3.utils.toWei(value, 'mwei').toString();
 }
 
+function gwei(value) {
+  return web3.utils.toWei(value.toString(), 'gwei').toString();
+}
+
 /**
  * Finds a first event/arg occurrence and returns a value
  * @param {object} receipt
@@ -170,7 +174,7 @@ function splitCalldata(data) {
  * @param v
  * @returns {string}
  */
-function K(v) {
+function kether(v) {
   return ether(v * 1000);
 }
 
@@ -200,13 +204,14 @@ module.exports = {
   deployProxied,
   ether,
   mwei,
+  gwei,
   tether,
   getEventArg,
   splitCalldata,
   fetchLogs,
   getResTimestamp,
   decodeRevertBytes,
-  K,
+  kether,
   address,
   keccak256,
   uint256,
