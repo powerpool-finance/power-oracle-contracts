@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { address, ether, mwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
+const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -21,8 +21,10 @@ MockOracle.numberFormat = 'String';
 const ETH_SYMBOL_HASH = keccak256('ETH');
 const CVP_SYMBOL_HASH = keccak256('CVP');
 const USDT_SYMBOL_HASH = keccak256('USDT');
-const REPORT_REWARD_IN_ETH = ether('0.02');
-const MAX_CVP_REWARD = ether(15);
+const CVP_APY = ether(20);
+const TOTAL_REPORTS_PER_YEAR = '90000';
+const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
+const GAS_PRICE_LIMIT = gwei(1000);
 const ANCHOR_PERIOD = '45';
 const MIN_REPORT_INTERVAL = '30';
 const MIN_REPORT_INTERVAL_INT = 30;
@@ -66,7 +68,7 @@ describe('PowerOracle', function () {
     oracle = await deployProxied(
       StubOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
     );
 
@@ -80,14 +82,16 @@ describe('PowerOracle', function () {
       expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
       expect(await oracle.reservoir()).to.be.equal(reservoir);
       expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
-      expect(await oracle.tokenReportReward()).to.be.equal(REPORT_REWARD_IN_ETH);
-      expect(await oracle.maxCvpReward()).to.be.equal(MAX_CVP_REWARD);
+      expect(await oracle.cvpAPY()).to.be.equal(CVP_APY);
+      expect(await oracle.totalReportsPerYear()).to.be.equal(TOTAL_REPORTS_PER_YEAR);
+      expect(await oracle.gasExpensesPerAssetReport()).to.be.equal(GAS_EXPENSES_PER_ASSET_REPORT);
+      expect(await oracle.gasPriceLimit()).to.be.equal(GAS_PRICE_LIMIT);
       expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
       expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
     });
 
     it('should deny initializing again', async function() {
-      await expect(oracle.initialize(owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
+      await expect(oracle.initialize(owner, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })
@@ -133,20 +137,21 @@ describe('PowerOracle', function () {
         oracle = await deployProxied(
           MockOracle,
           [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-          [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+          [owner, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
           { proxyAdminOwner: owner }
         );
         await staking.setPowerOracle(oracle.address, { from: deployer });
         await oracle.mockSetAnchorPrice('ETH', mwei('320'));
-        await oracle.mockSetAnchorPrice('CVP', mwei('2.5'));
-        // NOTICE: so the 1 token reward is `1 (count) * 0.02 (reward in ETH) * 320 (ETH price) / 2.5 (CVP price) `
-        // which equals to `2.56 CVP`
+        await oracle.mockSetAnchorPrice('CVP', mwei('5'));
+        await staking.mockSetUser(1, alice, validReporterPoker, kether(270));
+        // NOTICE: so the 1 token reward with 35 gwei gas price is
+        // `1 (count) * 0.6 + 0.2464 = 0.8464 CVP`
       })
 
       it('should assign ETH/CVP prices correctly', async function() {
         await oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker });
         expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('320'))
-        expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('2.5'))
+        expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('5'))
       });
 
       it('should not reward a reporter for reporting CVP and ETH', async function() {
@@ -168,7 +173,7 @@ describe('PowerOracle', function () {
       });
 
       it('should update CVP/ETH along with', async function() {
-        const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporterPoker });
+        const res = await oracle.pokeFromReporter(1, ['REP', 'DAI'], { from: validReporterPoker, gasPrice: gwei(35) });
         const resTimestamp = await getResTimestamp(res);
 
         expectMockedPriceUpdateEvent({
@@ -189,17 +194,17 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '2',
-          calculatedReward: ether('5.12')
+          calculatedReward: ether('1.6928')
         });
       });
 
       it('should update but not reward a reporter if there is not enough time passed from the last report', async function() {
-        await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
+        await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker, gasPrice: gwei(35) });
         await time.increase(10);
-        const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker });
+        const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker, gasPrice: gwei(35) });
         const resTimestamp = await getResTimestamp(res);
 
-        expect(await oracle.rewards(1)).to.be.equal(ether('2.56'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('0.8464'));
 
         expectMockedPriceUpdateEvent({
           response: res,
@@ -219,29 +224,29 @@ describe('PowerOracle', function () {
         expectEvent(res, 'NothingToReward', {
           userId: '1',
         });
-        expect(await oracle.rewards(1)).to.be.equal(ether('2.56'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('0.8464'));
       });
 
       it('should partially update on partially outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const firstTimestamp = await getResTimestamp(res);
-        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.5392'));
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
-        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
-        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.5392'));
         await time.increase(20);
 
         // 3rd poke
-        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const thirdTimestamp = await getResTimestamp(res);
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
         // 19.2 + 12.8
-        expect(await oracle.rewards(1)).to.be.equal(ether('12.8'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('4.232'));
 
         expectMockedPriceUpdateEvent({
           response: res,
@@ -261,26 +266,26 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '2',
-          calculatedReward: ether('5.12')
+          calculatedReward: ether('1.6928')
         });
       });
 
       it('should fully update on fully outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker });
+        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const firstTimestamp = await getResTimestamp(res);
-        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.5392'));
 
         await time.increase(MIN_REPORT_INTERVAL_INT - 5);
 
         // 2nd poke
-        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker });
-        expect(await oracle.rewards(1)).to.be.equal(ether('7.68'));
+        res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
+        expect(await oracle.rewards(1)).to.be.equal(ether('2.5392'));
         // NOTICE: the only difference with the example above
         await time.increase(120);
 
         // 3rd poke
-        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+        res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const thirdTimestamp = await getResTimestamp(res);
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
@@ -303,7 +308,7 @@ describe('PowerOracle', function () {
         expectEvent(res, 'RewardUser', {
           userId: '1',
           count: '3',
-          calculatedReward: ether('7.68')
+          calculatedReward: ether('2.5392')
         });
       });
     });
@@ -496,31 +501,55 @@ describe('PowerOracle', function () {
   });
 
   describe('owner methods', () => {
-    describe('setReportReward', () => {
-      it('should allow the owner setting a new report reward', async function() {
-        await oracle.setTokenReportReward(42, { from: owner });
-        expect(await oracle.tokenReportReward()).to.be.equal('42');
+    describe('setCvpAPY', () => {
+      it('should allow the owner setting a new value', async function() {
+        await oracle.setCvpAPY(42, { from: owner });
+        expect(await oracle.cvpAPY()).to.be.equal('42');
       });
 
       it('should deny non-reporter calling the method', async function() {
-        await expect(oracle.setTokenReportReward(42, { from: alice }))
+        await expect(oracle.setCvpAPY(42, { from: alice }))
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
 
-    describe('setMaxCvpReward', () => {
-      it('should allow the owner setting a new report reward', async function() {
-        await oracle.setMaxCvpReward(333, { from: owner });
-        expect(await oracle.maxCvpReward()).to.be.equal('333');
+    describe('setTotalReportsPerYear', () => {
+      it('should allow the owner setting a new value', async function() {
+        await oracle.setTotalReportsPerYear(42, { from: owner });
+        expect(await oracle.totalReportsPerYear()).to.be.equal('42');
       });
 
       it('should deny non-reporter calling the method', async function() {
-        await expect(oracle.setMaxCvpReward(333, { from: alice }))
+        await expect(oracle.setTotalReportsPerYear(42, { from: alice }))
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
 
-    describe('setPowerOracleStaking', () => {
+    describe('setGasExpensesPerAssetReport', () => {
+      it('should allow the owner setting a new value', async function() {
+        await oracle.setGasExpensesPerAssetReport(42, { from: owner });
+        expect(await oracle.gasExpensesPerAssetReport()).to.be.equal('42');
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setGasExpensesPerAssetReport(42, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setGasPriceLimit', () => {
+      it('should allow the owner setting value', async function() {
+        await oracle.setGasPriceLimit(42, { from: owner });
+        expect(await oracle.gasPriceLimit()).to.be.equal('42');
+      });
+
+      it('should deny non-reporter calling the method', async function() {
+        await expect(oracle.setGasPriceLimit(42, { from: alice }))
+          .to.be.revertedWith('Ownable: caller is not the owner');
+      });
+    });
+
+    describe('setGasPriceLimit', () => {
       it('should allow the owner setting a new report reward', async function() {
         await oracle.setPowerOracleStaking(sink, { from: owner });
         expect(await oracle.powerOracleStaking()).to.be.equal(sink);
@@ -615,33 +644,72 @@ describe('PowerOracle', function () {
     });
 
     describe('calculateReward', () => {
-      it('should correctly calculate a reward', async () => {
-        expect(await oracle.calculateReward(3, String(320e18), String(5e18))).to.be.equal(ether('3.84'));
-        expect(await oracle.calculateReward(3, String(320e18), String(2.5e18))).to.be.equal(ether('7.68'));
-        expect(await oracle.calculateReward(3, String(320e18), String(1e18))).to.be.equal(ether('19.2'));
-      })
+      beforeEach(async function() {
+        await oracle.setCvpAPY(ether(20), { from: owner });
+        await oracle.setTotalReportsPerYear(90000, { from: owner });
+        await oracle.setGasPriceLimit(gwei(1000), { from: owner });
+        await oracle.setGasExpensesPerAssetReport(110000, { from: owner });
+      });
 
-      it('should use max CVP reward if a calculated reward overflows', async () => {
-        expect(await oracle.calculateReward(3, String(320e18), String(0.2e18))).to.be.equal(ether('45'));
+      it('should correctly calculate a reward', async () => {
+        // 3 * (0.6 + 0.2464) = 3 * 0.8464 = 2.5392
+        expect(await oracle.calculateReward(3, kether(270), String(320e18), String(5e18), { gasPrice: gwei(35) })).to.be.equal(ether('2.5392'));
       })
 
       it('should return 0 for 0 count', async () => {
-        expect(await oracle.calculateReward(0, 2, 2)).to.be.equal('0');
-      })
-
-      it('should should revert when ethReward is 0', async () => {
-        await oracle.setTokenReportReward(0, { from: owner });
-        await expect(oracle.calculateReward(1, 1, 3)).to.be.revertedWith('calculateReward: ethReward is 0');
+        expect(await oracle.calculateReward(0, kether(45), 2, 2)).to.be.equal('0');
       })
 
       it('should should revert when ETH price is 0', async () => {
-        await expect(oracle.calculateReward(1, 0, 3)).to.be.revertedWith('calculateReward: ETH price is 0');
-        // await expect(call(uniswapAnchoredView, 'calculateReward', [1, 0, 3])).rejects.toRevert('revert calculateReward: ETH price is 0');
+        await expect(oracle.calculateReward(1, 1, 0, 3)).to.be.revertedWith('PowerOracle::calculateGasCompensation: ETH price is 0');
       })
 
       it('should should revert when CVP price is 0', async () => {
-        await expect(oracle.calculateReward(1, 1, 0)).to.be.revertedWith('calculateReward: CVP price is 0');
-        // await expect(call(uniswapAnchoredView, 'calculateReward', [1, 1, 0])).rejects.toRevert('revert calculateReward: CVP price is 0');
+        await expect(oracle.calculateReward(1, 1, 1, 0)).to.be.revertedWith('PowerOracle::calculateGasCompensation: CVP price is 0');
+      })
+    });
+
+    describe('calculateFixedReward', () => {
+      beforeEach(async function() {
+        await oracle.setCvpAPY(ether(20), { from: owner });
+        await oracle.setTotalReportsPerYear(90000, { from: owner });
+      });
+
+      it('should correctly calculate a reward', async () => {
+        // 270e21 * 20e18 / 90000 * 100e18 = 0.6
+        expect(await oracle.calculateFixedReward(kether(270))).to.be.equal(ether('0.6'));
+        // 45e21 * 20e18 / 90000 * 100e18 = 0.1
+        expect(await oracle.calculateFixedReward(kether(45))).to.be.equal(ether('0.1'));
+      })
+
+      it('should return 0 for 0 count', async () => {
+        expect(await oracle.calculateFixedReward(0)).to.be.equal('0');
+      })
+    });
+
+    describe('calculateGasCompensation', () => {
+      beforeEach(async function() {
+        await oracle.setGasPriceLimit(gwei(1000), { from: owner });
+        await oracle.setGasExpensesPerAssetReport(110000, { from: owner });
+      });
+
+      it('should correctly calculate a reward', async () => {
+        // 35 gwei * 110_000 * 320e18 / 5e18 = 0.2464 CVP
+        expect(await oracle.calculateGasCompensation(String(320e18), String(5e18), { gasPrice: gwei(35) })).to.be.equal(ether('0.2464'));
+        // 350 gwei * 110_000 * 320e18 / 5e18 = 2.464e17 CVP
+        expect(await oracle.calculateGasCompensation(String(320e18), String(5e18), { gasPrice: gwei(350) })).to.be.equal(ether('2.464'));
+      })
+
+      it('should use max gas price if the provided value is greater that the limit', async () => {
+        expect(await oracle.calculateGasCompensation(String(320e18), String(5e18), { gasPrice: gwei(3500) })).to.be.equal(ether('7.04'));
+      })
+
+      it('should should revert when ETH price is 0', async () => {
+        await expect(oracle.calculateGasCompensation(0, 1)).to.be.revertedWith('PowerOracle::calculateGasCompensation: ETH price is 0');
+      })
+
+      it('should should revert when CVP price is 0', async () => {
+        await expect(oracle.calculateGasCompensation(1, 0)).to.be.revertedWith('PowerOracle::calculateGasCompensation: CVP price is 0');
       })
     });
   })

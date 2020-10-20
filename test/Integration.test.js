@@ -1,5 +1,5 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
-const { ether, deployProxied, getEventArg } = require('./helpers');
+const { ether, gwei, deployProxied, getEventArg } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 const { solidity } = require('ethereum-waffle');
 
@@ -15,14 +15,16 @@ MockCVP.numberFormat = 'String';
 PowerOracleStaking.numberFormat = 'String';
 PowerOracle.numberFormat = 'String';
 
-const REPORT_REWARD_IN_ETH = ether('0.05');
-const MAX_CVP_REWARD = ether(15);
 const ANCHOR_PERIOD = 30;
 const MIN_REPORT_INTERVAL = 60;
 const MAX_REPORT_INTERVAL = 90;
 const MIN_SLASHING_DEPOSIT = ether(40);
 const SLASHER_REWARD_PCT = ether(15);
 const RESERVOIR_REWARD_PCT = ether(5);
+const CVP_APY = ether(20);
+const TOTAL_REPORTS_PER_YEAR = '90000';
+const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
+const GAS_PRICE_LIMIT = gwei(1000);
 
 describe('IntegrationTest', function () {
   let staking;
@@ -50,7 +52,7 @@ describe('IntegrationTest', function () {
     oracle = await deployProxied(
       PowerOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [owner, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
       );
 
@@ -172,7 +174,6 @@ describe('IntegrationTest', function () {
     expect(await staking.getDepositOf(aliceId)).to.be.equal('0');
     expect(await staking.getDepositOf(bobId)).to.be.equal(ether(95));
     expect(await staking.getDepositOf(charlieId)).to.be.equal(ether(30));
-
 
     expect(await staking.getReporterId()).to.be.equal(bobId);
     expect(await staking.getHighestDeposit()).to.be.equal(ether(95));
