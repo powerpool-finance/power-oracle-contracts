@@ -15,9 +15,13 @@ interface IPowerOracle {
   function withdrawRewards(uint256 userId, address to) external;
 
   /*** Owner Interface ***/
-  function setTokenReportReward(uint256 tokenReportReward) external;
+  function setCvpAPY(uint256 cvpAPY_) external;
 
-  function setMaxCvpReward(uint256 maxCvpReward) external;
+  function setTotalReportsPerYear(uint256 totalReportsPerYear_) external;
+
+  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_) external;
+
+  function setGasPriceLimit(uint256 gasPriceLimit_) external;
 
   function setPowerOracleStaking(address powerOracleStaking) external;
 
