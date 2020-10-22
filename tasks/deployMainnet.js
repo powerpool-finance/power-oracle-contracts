@@ -103,7 +103,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     // count
     const TOTAL_REPORTS_PER_YEAR = '105120';
     // In gas
-    const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
+    const GAS_EXPENSES_PER_ASSET_REPORT = '85000';
     // In wei
     const GAS_PRICE_LIMIT = gwei(1000);
 
