@@ -116,7 +116,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('>>> Deploying PowerOracleStaking...');
     const staking = await deployProxied(
       PowerOracleStaking,
-      [tokens['CVP'], deployer],
+      [tokens['CVP'], RESERVOIR],
       [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
       { proxyAdminOwner: PROXY_OWNER }
     );

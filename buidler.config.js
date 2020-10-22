@@ -9,6 +9,11 @@ require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
 
+const fs = require('fs');
+const homeDir = require('os').homedir();
+const _ = require('lodash');
+
+const mainnetKey = _.trim('0x' + fs.readFileSync(homeDir + '/.ethereum/mainnet', {encoding: 'utf8'}));
 
 const config = {
   analytics: {
@@ -32,6 +37,8 @@ const config = {
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
+      gasPrice: 41000000000,
+      accounts: [mainnetKey]
     },
     local: {
       url: 'http://127.0.0.1:8545',
