@@ -7,7 +7,7 @@ usePlugin('@nomiclabs/buidler-truffle5');
 
 task('deploy-testnet', 'Deploys testnet contracts')
   .setAction(async () => {
-    const { deployProxied, ether, address, keccak256, uint } = require('../test/helpers');
+    const { deployProxied, ether, gwei, address, keccak256, uint } = require('../test/helpers');
     const { constants } = require('@openzeppelin/test-helpers');
 
     const PowerOracleStaking = artifacts.require('PowerOracleStaking');
@@ -21,23 +21,26 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const [deployer] = await web3.eth.getAccounts();
 
     const I1E30 = '1000000000000000000000000000000';
-    const REPORT_REWARD_IN_ETH = ether('0.05');
-    // Max CVP Reward per report
-    const MAX_CVP_REWARD = ether(15);
     // Anchor period for uniswap price checkpoint in seconds
-    const ANCHOR_PERIOD = 1800;
+    const ANCHOR_PERIOD = 30;
     // In seconds
-    const MIN_REPORT_INTERVAL = 2700;
+    const MIN_REPORT_INTERVAL = 30;
     // In seconds
-    const MAX_REPORT_INTERVAL = 3600;
+    const MAX_REPORT_INTERVAL = 45;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
     const MIN_SLASHING_DEPOSIT = ether(40);
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const SLASHER_REWARD_PCT = ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const RESERVOIR_REWARD_PCT = ether('0.005');
-    // A multiplier to reward an outdated reporter ID updater who calls the permissionless setReporter() function.
-    const SET_USER_REWARD_COUNT = 3;
+    // 1 ether == 1%
+    const CVP_APY = ether(20);
+    // count
+    const TOTAL_REPORTS_PER_YEAR = '90000';
+    // In gas
+    const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
+    // In wei
+    const GAS_PRICE_LIMIT = gwei(1000);
     const MockCVP = artifacts.require('MockCVP');
     const OWNER = '0xe7F2f6bb028E2c01C2C34e01BFFe5f534E7f1901';
     // The same as deployer
@@ -201,7 +204,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const staking = await deployProxied(
       PowerOracleStaking,
       [cvpToken.address, deployer],
-      [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, SET_USER_REWARD_COUNT],
+      [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
       { proxyAdminOwner: OWNER }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
@@ -217,11 +220,15 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const oracle = await deployProxied(
       PowerOracle,
       [cvpToken.address, RESERVOIR, ANCHOR_PERIOD, tokenConfigs],
-      [OWNER, staking.address, REPORT_REWARD_IN_ETH, MAX_CVP_REWARD, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [OWNER, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: OWNER }
     );
     console.log('>>> PowerOracle (proxy) deployed at', oracle.address);
     console.log('>>> PowerOracle implementation deployed at', oracle.initialImplementation.address);
+    console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
+    console.log('>>> PowerOracleStaking implementation deployed at', staking.initialImplementation.address);
+    console.log('>>> Factory deployed at', factory.address);
+    console.log('>>> Router is deployed at', router.address)
     console.log('>>> WETH deployed at', deployedTokens[totalErc20StubsToDeploy.indexOf('ETH')].address);
     console.log('>>> USDC deployed at', deployedTokens[totalErc20StubsToDeploy.indexOf('USDC')].address);
 
@@ -232,7 +239,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     await staking.transferOwnership(OWNER);
 
     console.log('>>> Approving 10 000 CVP from fake reservoir (deployer) to PowerOracle');
-    await cvpToken.approve(oracle.address, ether(10000));
+    await cvpToken.approve(oracle.address, ether(100000));
 
     console.log('>>> Making the initial poke');
     await oracle.poke(withPairKeys.filter(p => p !== 'USDC'));

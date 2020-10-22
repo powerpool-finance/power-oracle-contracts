@@ -42,9 +42,9 @@ contract MockUniswapTokenPair {
     external
     view
     returns (
-      uint112,
-      uint112,
-      uint32
+      uint112 reserve0,
+      uint112 reserve1,
+      uint32 blockTimestampLast
     )
   {
     return (reserve0, reserve1, blockTimestampLast);
