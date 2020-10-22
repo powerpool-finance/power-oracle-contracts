@@ -87,7 +87,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     console.log('configs', tokenConfigs);
 
-    const ANCHOR_PERIOD = 30;
+    const ANCHOR_PERIOD = 1800;
     // In seconds
     const MIN_REPORT_INTERVAL = 2700;
     // In seconds
@@ -108,6 +108,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const GAS_PRICE_LIMIT = gwei(1000);
 
     const OWNER = '0xB258302C3f209491d604165549079680708581Cc';
+    const PROXY_OWNER = OWNER;
     const RESERVOIR = '0x8EbC56A13Ae7e3cE27B960b16AA57efed3F4e79E';
 
     console.log('Deployer address is', deployer);
@@ -117,7 +118,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerOracleStaking,
       [tokens['CVP'], deployer],
       [deployer, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
-      { proxyAdminOwner: OWNER }
+      { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
     console.log('>>> PowerOracleStaking implementation deployed at', staking.initialImplementation.address);
@@ -127,7 +128,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerOracle,
       [tokens['CVP'], RESERVOIR, ANCHOR_PERIOD, tokenConfigs],
       [OWNER, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
-      { proxyAdminOwner: OWNER }
+      { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerOracle (proxy) deployed at', oracle.address);
     console.log('>>> PowerOracle implementation deployed at', oracle.initialImplementation.address);
@@ -137,7 +138,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
-    await staking.transferOwnership(OWNER);
+    await oracle.transferOwnership(OWNER);
 
     console.log('Done');
   });

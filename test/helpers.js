@@ -36,6 +36,7 @@ async function deployProxied(
 ) {
   const impl = await contract.new(...constructorArgs);
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
+  console.log('adminContract.address', adminContract.address);
   const data = getInitializerData(impl, initializerArgs, opts.initializer);
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
   const instance = await contract.at(proxy.address);
