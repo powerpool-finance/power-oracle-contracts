@@ -7,6 +7,7 @@ usePlugin('buidler-gas-reporter');
 
 require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
+require('./tasks/deployMainnet')
 
 
 const config = {
