@@ -13,7 +13,13 @@ const fs = require('fs');
 const homeDir = require('os').homedir();
 const _ = require('lodash');
 
-const mainnetKey = _.trim('0x' + fs.readFileSync(homeDir + '/.ethereum/mainnet', {encoding: 'utf8'}));
+function getAccounts(network) {
+  const fileName = homeDir + '/.ethereum/' + network;
+  if(!fs.existsSync(fileName)) {
+    return [];
+  }
+  return [_.trim('0x' + fs.readFileSync(fileName, {encoding: 'utf8'}))];
+}
 
 const config = {
   analytics: {
@@ -38,7 +44,7 @@ const config = {
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       gasPrice: 41000000000,
-      accounts: [mainnetKey]
+      accounts: getAccounts('mainnet')
     },
     local: {
       url: 'http://127.0.0.1:8545',
