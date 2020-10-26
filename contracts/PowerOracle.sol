@@ -262,6 +262,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
 
     uint256 ethPrice = _updateEthPrice();
+    uint256 cvpPrice = _updateCvpPrice(ethPrice);
     uint256 overdueCount = 0;
 
     for (uint256 i = 0; i < len; i++) {
@@ -273,6 +274,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     emit PokeFromSlasher(slasherId_, len, overdueCount);
     if (overdueCount > 0) {
       powerOracleStaking.slash(slasherId_, overdueCount);
+      _rewardUser(slasherId_, overdueCount, ethPrice, cvpPrice);
     }
   }
 
