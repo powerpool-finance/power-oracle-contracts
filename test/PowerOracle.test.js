@@ -325,13 +325,17 @@ describe('PowerOracle', function () {
       let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       const firstTimestamp = await getResTimestamp(res);
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
+      res = await oracle.pokeFromSlasher(2, ['REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
-        tokenCount: '4',
-        overdueCount: '4'
+        tokenCount: '3',
+        overdueCount: '3'
+      });
+      expectEvent(res, 'RewardUser', {
+        userId: '2',
+        count: '3'
       });
       expectPriceUpdateEvent({
         response: res,
@@ -342,7 +346,7 @@ describe('PowerOracle', function () {
 
       expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
-        overdueCount: '4'
+        overdueCount: '3'
       });
     });
 
@@ -363,6 +367,10 @@ describe('PowerOracle', function () {
         slasherId: '2',
         tokenCount: '4',
         overdueCount: '2'
+      });
+      expectEvent(res, 'RewardUser', {
+        userId: '2',
+        count: '2'
       });
       expectPriceUpdateEvent({
         response: res,
@@ -391,6 +399,9 @@ describe('PowerOracle', function () {
         tokenCount: '4',
         overdueCount: '0'
       });
+
+      expectEvent.notEmitted(res, 'RewardUser');
+
       expectPriceUpdateEvent({
         response: res,
         tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
@@ -403,7 +414,7 @@ describe('PowerOracle', function () {
     });
 
     it('should deny another user calling an behalf of reporter', async function() {
-      await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP'], { from: alice }))
+      await expect(oracle.pokeFromSlasher(2, ['REP'], { from: alice }))
         .to.be.revertedWith('PowerOracleStaking::authorizeSlasher: Invalid poker key');
     });
 

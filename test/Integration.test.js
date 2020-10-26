@@ -97,11 +97,11 @@ describe('IntegrationTest', function () {
     expect(await staking.getHighestDeposit()).to.be.equal(ether(100));
 
     // 1st Poke (Initial)
-    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP', 'CVP'], { from: alicePoker });
+    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP'], { from: alicePoker });
 
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
-      tokenCount: '3',
+      tokenCount: '2',
       rewardCount: '2'
     })
 
@@ -113,11 +113,11 @@ describe('IntegrationTest', function () {
     await time.increase(40);
 
     // 2nd Poke
-    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP', 'CVP'], { from: alicePoker });
+    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP'], { from: alicePoker });
 
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
-      tokenCount: '3',
+      tokenCount: '2',
       rewardCount: '0'
     })
 
@@ -128,11 +128,11 @@ describe('IntegrationTest', function () {
     await time.increase(65);
 
     // 3rd Poke
-    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP', 'CVP'], { from: alicePoker });
+    res = await oracle.pokeFromReporter(aliceId, ['DAI', 'REP'], { from: alicePoker });
 
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
-      tokenCount: '3',
+      tokenCount: '2',
       rewardCount: '2'
     })
 
@@ -142,23 +142,23 @@ describe('IntegrationTest', function () {
     })
 
     // 4th Poke from Slasher which fails
-    res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP', 'CVP'], { from: bobPoker });
+    res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP'], { from: bobPoker });
     expectEvent(res, 'PokeFromSlasher', {
       slasherId: '2',
-      tokenCount: '3',
+      tokenCount: '2',
       overdueCount: '0'
     })
 
     await time.increase(95);
 
     // 5th Poke from Slasher which is successfull
-    res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP', 'CVP'], { from: bobPoker });
+    res = await oracle.pokeFromSlasher(bobId, ['DAI', 'REP'], { from: bobPoker });
     expectEvent(res, 'PokeFromSlasher', {
       slasherId: '2',
-      tokenCount: '3',
-      overdueCount: '3'
+      tokenCount: '2',
+      overdueCount: '2'
     })
-    expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(40));
+    expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(60));
 
     // Withdrawing rewards
     await oracle.withdrawRewards(aliceId, alice, { from: alice });
@@ -166,16 +166,16 @@ describe('IntegrationTest', function () {
       .to.be.revertedWith('PowerOracle::withdrawRewards: Nothing to withdraw');
 
     // Withdraw stake
-    await expect(staking.withdraw(aliceId, alice, ether(41), { from: alice }))
+    await expect(staking.withdraw(aliceId, alice, ether(61), { from: alice }))
       .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
-    await staking.withdraw(aliceId, alicePoker, ether(40), { from: alice });
-    expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(40));
+    await staking.withdraw(aliceId, alicePoker, ether(60), { from: alice });
+    expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(60));
 
     expect(await staking.getDepositOf(aliceId)).to.be.equal('0');
-    expect(await staking.getDepositOf(bobId)).to.be.equal(ether(95));
+    expect(await staking.getDepositOf(bobId)).to.be.equal(ether(80));
     expect(await staking.getDepositOf(charlieId)).to.be.equal(ether(30));
 
     expect(await staking.getReporterId()).to.be.equal(bobId);
-    expect(await staking.getHighestDeposit()).to.be.equal(ether(95));
+    expect(await staking.getHighestDeposit()).to.be.equal(ether(80));
   });
 });
