@@ -144,46 +144,49 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /*** Current Poke Interface ***/
 
   function _updateEthPrice() internal returns (uint256) {
+    bytes32 symbolHash = keccak256(abi.encodePacked("ETH"));
+    if (getIntervalStatus(symbolHash) == ReportInterval.LESS_THAN_MIN) {
+      return uint256(prices[symbolHash].value);
+    }
     uint256 ethPrice = fetchEthPrice();
-    _savePrice("ETH", ethPrice);
+    _savePrice(symbolHash, ethPrice);
     return ethPrice;
   }
 
   function _updateCvpPrice(uint256 ethPrice_) internal returns (uint256) {
+    bytes32 symbolHash = keccak256(abi.encodePacked("CVP"));
+    if (getIntervalStatus(symbolHash) == ReportInterval.LESS_THAN_MIN) {
+      return uint256(prices[symbolHash].value);
+    }
     uint256 cvpPrice = fetchCvpPrice(ethPrice_);
-    _savePrice("CVP", cvpPrice);
+    _savePrice(symbolHash, cvpPrice);
     return cvpPrice;
   }
 
   function _fetchAndSavePrice(string memory symbol_, uint256 ethPrice_) internal returns (ReportInterval) {
     TokenConfig memory config = getTokenConfigBySymbol(symbol_);
     require(config.priceSource == PriceSource.REPORTER, "only reporter prices get posted");
+    bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
+
+    ReportInterval intervalStatus = getIntervalStatus(symbolHash);
+    if (intervalStatus == ReportInterval.LESS_THAN_MIN) {
+      return intervalStatus;
+    }
 
     uint256 price;
-    if (keccak256(abi.encodePacked(symbol_)) == ethHash) {
+    if (symbolHash == ethHash) {
       price = ethPrice_;
     } else {
       price = fetchAnchorPrice(symbol_, config, ethPrice_);
     }
 
-    return _savePrice(symbol_, price);
+    _savePrice(symbolHash, price);
+
+    return intervalStatus;
   }
 
-  function _savePrice(string memory symbol_, uint256 price_) internal returns (ReportInterval) {
-    bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
-
-    uint256 delta = block.timestamp - prices[symbolHash].timestamp;
-    prices[keccak256(abi.encodePacked(symbol_))] = Price(block.timestamp.toUint128(), price_.toUint128());
-
-    if (delta < minReportInterval) {
-      return ReportInterval.LESS_THAN_MIN;
-    }
-
-    if (delta < maxReportInterval) {
-      return ReportInterval.OK;
-    }
-
-    return ReportInterval.GREATER_THAN_MAX;
+  function _savePrice(bytes32 _symbolHash, uint256 price_) internal {
+    prices[_symbolHash] = Price(block.timestamp.toUint128(), price_.toUint128());
   }
 
   function _rewardUser(
@@ -409,6 +412,20 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
     // return _min(tx.gasprice, gasPriceLimit) * gasExpensesPerAssetReport * ethPrice_ / cvpPrice_;
     return _min(tx.gasprice, gasPriceLimit).mul(gasExpensesPerAssetReport).mul(ethPrice_) / cvpPrice_;
+  }
+
+  function getIntervalStatus(bytes32 _symbolHash) public view returns(ReportInterval) {
+    uint256 delta = block.timestamp - prices[_symbolHash].timestamp;
+
+    if (delta < minReportInterval) {
+      return ReportInterval.LESS_THAN_MIN;
+    }
+
+    if (delta < maxReportInterval) {
+      return ReportInterval.OK;
+    }
+
+    return ReportInterval.GREATER_THAN_MAX;
   }
 
   /**
