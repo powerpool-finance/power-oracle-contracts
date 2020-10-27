@@ -21,7 +21,7 @@ interface IPowerOracle {
 
   function setTotalPerYear(uint256 totalReportsPerYear_, uint256 totalSlasherUpdatesPerYear_) external;
 
-  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external;
+  function setGasExpenses(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external;
 
   function setGasPriceLimit(uint256 gasPriceLimit_) external;
 

@@ -21,9 +21,12 @@ const MAX_REPORT_INTERVAL = 90;
 const MIN_SLASHING_DEPOSIT = ether(40);
 const SLASHER_REWARD_PCT = ether(15);
 const RESERVOIR_REWARD_PCT = ether(5);
-const CVP_APY = ether(20);
+const CVP_REPORT_APY = ether(20);
+const CVP_SLASHER_UPDATE_APY = ether(10);
 const TOTAL_REPORTS_PER_YEAR = '90000';
+const TOTAL_SLASHER_UPDATES_PER_YEAR = '50000';
 const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
+const GAS_EXPENSES_FOR_SLASHER_UPDATE = '10000';
 const GAS_PRICE_LIMIT = gwei(1000);
 
 describe('IntegrationTest', function () {
@@ -52,7 +55,7 @@ describe('IntegrationTest', function () {
     oracle = await deployProxied(
       PowerOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [owner, staking.address, CVP_APY, TOTAL_REPORTS_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
       );
 
@@ -105,7 +108,7 @@ describe('IntegrationTest', function () {
       rewardCount: '2'
     })
 
-    expectEvent(res, 'RewardUser', {
+    expectEvent(res, 'RewardUserReport', {
       userId: '1',
       count: '2',
     })
@@ -136,7 +139,7 @@ describe('IntegrationTest', function () {
       rewardCount: '2'
     })
 
-    expectEvent(res, 'RewardUser', {
+    expectEvent(res, 'RewardUserReport', {
       userId: '1',
       count: '2',
     })

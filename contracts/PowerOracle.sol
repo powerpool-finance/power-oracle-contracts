@@ -157,8 +157,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     address owner_,
     address powerOracleStaking_,
     uint256 cvpReportAPY_,
+    uint256 cvpSlasherUpdateAPY_,
     uint256 totalReportsPerYear_,
+    uint256 totalSlasherUpdatesPerYear_,
     uint256 gasExpensesPerAssetReport_,
+    uint256 gasExpensesForSlasherStatusUpdate_,
     uint256 gasPriceLimit_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
@@ -166,8 +169,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     _transferOwnership(owner_);
     powerOracleStaking = IPowerOracleStaking(powerOracleStaking_);
     cvpReportAPY = cvpReportAPY_;
+    cvpSlasherUpdateAPY = cvpSlasherUpdateAPY_;
     totalReportsPerYear = totalReportsPerYear_;
+    totalSlasherUpdatesPerYear = totalSlasherUpdatesPerYear_;
     gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
+    gasExpensesForSlasherStatusUpdate = gasExpensesForSlasherStatusUpdate_;
     gasPriceLimit = gasPriceLimit_;
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
@@ -409,7 +415,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param gasExpensesPerAssetReport_ The gas amount for reporting a single asset
    * @param gasExpensesForSlasherStatusUpdate_ The gas amount for updating slasher status
    */
-  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external override onlyOwner {
+  function setGasExpenses(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external override onlyOwner {
     gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
     gasExpensesForSlasherStatusUpdate = gasExpensesForSlasherStatusUpdate_;
     emit SetGasExpenses(gasExpensesPerAssetReport_, gasExpensesForSlasherStatusUpdate_);
