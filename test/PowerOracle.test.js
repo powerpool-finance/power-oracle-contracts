@@ -26,7 +26,7 @@ const CVP_SLASHER_UPDATE_APY = ether(10);
 const TOTAL_REPORTS_PER_YEAR = '90000';
 const TOTAL_SLASHER_UPDATES_PER_YEAR = '50000';
 const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
-const GAS_EXPENSES_FOR_SLASHER_UPDATE = '10000';
+const GAS_EXPENSES_FOR_SLASHER_UPDATE = '117500';
 const GAS_PRICE_LIMIT = gwei(1000);
 const ANCHOR_PERIOD = '45';
 const MIN_REPORT_INTERVAL = '30';
@@ -347,6 +347,13 @@ describe('PowerOracle', function () {
 
   describe('pokeFromSlasher', () => {
     beforeEach(async () => {
+      oracle = await deployProxied(
+        MockOracle,
+        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+        [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        { proxyAdminOwner: owner }
+      );
+
       await staking.mockSetUser(1, alice, validReporterPoker, ether(300));
       await staking.mockSetReporter(1, ether(300));
       await staking.mockSetUser(2, alice, validSlasherPoker, ether(100));
@@ -356,9 +363,11 @@ describe('PowerOracle', function () {
       let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       const firstTimestamp = await getResTimestamp(res);
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+
       res = await oracle.pokeFromSlasher(2, ['REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
+      expectEvent.notEmitted(res, 'RewardUserSlasherUpdate');
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
         tokenCount: '3',
@@ -394,10 +403,14 @@ describe('PowerOracle', function () {
       res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
       const secondTimestamp = await getResTimestamp(res);
 
+      expectEvent.notEmitted(res, 'RewardUserSlasherUpdate');
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
         tokenCount: '4',
         overdueCount: '2'
+      });
+      expectEvent(res, 'UpdateSlasher', {
+        slasherId: '2',
       });
       expectEvent(res, 'RewardUserReport', {
         userId: '2',
@@ -417,18 +430,29 @@ describe('PowerOracle', function () {
     });
 
     it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
+      await oracle.mockSetAnchorPrice('ETH', mwei('320'));
+      await oracle.mockSetAnchorPrice('CVP', mwei('5'));
       // 1st poke
-      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       await time.increase(5);
 
       // 2nd poke
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
+      let res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) });
       const secondTimestamp = await getResTimestamp(res);
 
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
         tokenCount: '4',
         overdueCount: '0'
+      });
+
+      expectEvent(res, 'UpdateSlasher', {
+        slasherId: '2',
+      });
+
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '2',
+        calculatedReward: ether(0.2634)
       });
 
       expectEvent.notEmitted(res, 'RewardUserReport');
@@ -442,6 +466,28 @@ describe('PowerOracle', function () {
 
       const logs = await fetchLogs(MockStaking, res);
       expect(logs.length).to.be.equal(0);
+    });
+
+    it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
+      await oracle.mockSetAnchorPrice('ETH', mwei('320'));
+      await oracle.mockSetAnchorPrice('CVP', mwei('5'));
+      // 1st poke
+      await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await time.increase(5);
+
+      // 2nd poke
+      let res = await oracle.slasherUpdate(2, { from: validSlasherPoker, gasPrice: gwei(35) });
+
+      expectEvent(res, 'UpdateSlasher', {
+        slasherId: '2',
+      });
+
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '2',
+        calculatedReward: ether(0.2634)
+      });
+
+      expectEvent.notEmitted(res, 'RewardUserReport');
     });
 
     it('should deny another user calling an behalf of reporter', async function() {
@@ -690,7 +736,7 @@ describe('PowerOracle', function () {
         await oracle.setCvpAPY(ether(20), ether(10), { from: owner });
         await oracle.setTotalPerYear(90000, 50000, { from: owner });
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 90000, { from: owner });
+        await oracle.setGasExpenses(110000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {
@@ -732,7 +778,7 @@ describe('PowerOracle', function () {
     describe('calculateGasCompensation', () => {
       beforeEach(async function() {
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 90000, { from: owner });
+        await oracle.setGasExpenses(110000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {

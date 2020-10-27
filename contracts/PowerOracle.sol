@@ -56,7 +56,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   /// @notice The event emitted when a slasher receives their reward for the update
   event RewardUserSlasherUpdate(
-    uint256 indexed userId,
+    uint256 indexed slasherId,
     uint256 deposit,
     uint256 ethPrice,
     uint256 cvpPrice,
@@ -65,14 +65,14 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   /// @notice The event emitted when a slasher receives their reward for the update
   event RewardUserSlasherUpdateIgnored(
-    uint256 indexed userId,
+    uint256 indexed slasherId,
     uint256 deposit,
     uint256 ethPrice,
     uint256 cvpPrice,
     uint256 calculatedReward
   );
 
-  event UpdateSlasher(uint256 indexed userId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
+  event UpdateSlasher(uint256 indexed slasherId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
 
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
   event NothingToReward(uint256 indexed userId, uint256 ethPrice);
@@ -227,20 +227,15 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     prices[_symbolHash] = Price(block.timestamp.toUint128(), price_.toUint128());
   }
 
-  function _updateSlasher(
-    uint256 _slasherId,
-    uint256 _ethPrice,
-    uint256 _cvpPrice
-  ) internal {
-    uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
-    uint256 delta = block.timestamp.sub(prevSlasherUpdate);
-    if (delta < maxReportInterval) {
-      return;
+  function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
+    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
+    if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
+    if (config_.priceSource == PriceSource.FIXED_ETH) {
+      uint256 usdPerEth = prices[ethHash].value;
+      require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
+      return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
     }
-    lastSlasherUpdates[_slasherId] = block.timestamp;
-    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
-
-    emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
+    revert("UniswapTWAPProvider::priceInternal: Unsupported case");
   }
 
   function _rewardUser(
@@ -281,15 +276,23 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
   }
 
-  function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
-    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
-    if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
-    if (config_.priceSource == PriceSource.FIXED_ETH) {
-      uint256 usdPerEth = prices[ethHash].value;
-      require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
-      return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
+  function _updateSlasherAndReward(
+    uint256 _slasherId,
+    uint256 _ethPrice,
+    uint256 _cvpPrice
+  ) internal {
+    uint256 delta = block.timestamp.sub(lastSlasherUpdates[_slasherId]);
+    if (delta < maxReportInterval) {
+      return;
     }
-    revert("UniswapTWAPProvider::priceInternal: Unsupported case");
+    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
+    _updateSlasherTimestamp(_slasherId);
+  }
+
+  function _updateSlasherTimestamp(uint256 _slasherId) internal {
+    uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
+    lastSlasherUpdates[_slasherId] = block.timestamp;
+    emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
   }
 
   /*** Pokers ***/
@@ -345,9 +348,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     if (overdueCount > 0) {
       powerOracleStaking.slash(slasherId_, overdueCount);
       _rewardUser(slasherId_, overdueCount, ethPrice, cvpPrice);
-      lastSlasherUpdates[slasherId_] = block.timestamp;
+      _updateSlasherTimestamp(slasherId_);
     } else {
-      _updateSlasher(slasherId_, ethPrice, cvpPrice);
+      _updateSlasherAndReward(slasherId_, ethPrice, cvpPrice);
     }
   }
 
@@ -355,7 +358,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
 
     uint256 ethPrice = _fetchEthPrice();
-    _updateSlasher(slasherId_, ethPrice, _fetchCvpPrice(ethPrice));
+    _updateSlasherAndReward(slasherId_, ethPrice, _fetchCvpPrice(ethPrice));
   }
 
   /**
