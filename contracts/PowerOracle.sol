@@ -227,7 +227,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     prices[_symbolHash] = Price(block.timestamp.toUint128(), price_.toUint128());
   }
 
-  function _updateSlasher(uint256 _slasherId, uint256 _ethPrice, uint256 _cvpPrice) internal {
+  function _updateSlasher(
+    uint256 _slasherId,
+    uint256 _ethPrice,
+    uint256 _cvpPrice
+  ) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
     uint256 delta = block.timestamp.sub(prevSlasherUpdate);
     if (delta < maxReportInterval) {
@@ -404,7 +408,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param totalReportsPerYear_ The total number of reports
    * @param totalSlasherUpdatesPerYear_ The total number of slasher updates
    */
-  function setTotalPerYear(uint256 totalReportsPerYear_, uint256 totalSlasherUpdatesPerYear_) external override onlyOwner {
+  function setTotalPerYear(uint256 totalReportsPerYear_, uint256 totalSlasherUpdatesPerYear_)
+    external
+    override
+    onlyOwner
+  {
     totalReportsPerYear = totalReportsPerYear_;
     totalSlasherUpdatesPerYear = totalSlasherUpdatesPerYear_;
     emit SetTotalReportsPerYear(totalReportsPerYear_, totalSlasherUpdatesPerYear_);
@@ -415,7 +423,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param gasExpensesPerAssetReport_ The gas amount for reporting a single asset
    * @param gasExpensesForSlasherStatusUpdate_ The gas amount for updating slasher status
    */
-  function setGasExpenses(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external override onlyOwner {
+  function setGasExpenses(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_)
+    external
+    override
+    onlyOwner
+  {
     gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
     gasExpensesForSlasherStatusUpdate = gasExpensesForSlasherStatusUpdate_;
     emit SetGasExpenses(gasExpensesPerAssetReport_, gasExpensesForSlasherStatusUpdate_);
@@ -476,8 +488,12 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       return 0;
     }
 
-    // return count_ * (calculateReporterFixedReward(deposit_) + calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesPerAssetReport));
-    return count_.mul(calculateReporterFixedReward(deposit_).add(calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesPerAssetReport)));
+    return
+      count_.mul(
+        calculateReporterFixedReward(deposit_).add(
+          calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesPerAssetReport)
+        )
+      );
   }
 
   function calculateReporterFixedReward(uint256 deposit_) public view returns (uint256) {
@@ -485,7 +501,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return cvpReportAPY.mul(deposit_) / totalReportsPerYear / HUNDRED_PCT;
   }
 
-  function calculateGasCompensation(uint256 ethPrice_, uint256 cvpPrice_, uint256 gasExpenses_) public view returns (uint256) {
+  function calculateGasCompensation(
+    uint256 ethPrice_,
+    uint256 cvpPrice_,
+    uint256 gasExpenses_
+  ) public view returns (uint256) {
     require(ethPrice_ > 0, "PowerOracle::calculateGasCompensation: ETH price is 0");
     require(cvpPrice_ > 0, "PowerOracle::calculateGasCompensation: CVP price is 0");
 
@@ -498,8 +518,10 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 ethPrice_,
     uint256 cvpPrice_
   ) public view returns (uint256) {
-    // return (calculateReporterFixedReward(deposit_) + calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesForSlasherStatusUpdate));
-    return calculateSlasherFixedReward(deposit_).add(calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesForSlasherStatusUpdate));
+    return
+      calculateSlasherFixedReward(deposit_).add(
+        calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesForSlasherStatusUpdate)
+      );
   }
 
   function calculateSlasherFixedReward(uint256 deposit_) public view returns (uint256) {
