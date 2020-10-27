@@ -414,7 +414,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     return _min(tx.gasprice, gasPriceLimit).mul(gasExpensesPerAssetReport).mul(ethPrice_) / cvpPrice_;
   }
 
-  function getIntervalStatus(bytes32 _symbolHash) public view returns(ReportInterval) {
+  function getIntervalStatus(bytes32 _symbolHash) public view returns (ReportInterval) {
     uint256 delta = block.timestamp - prices[_symbolHash].timestamp;
 
     if (delta < minReportInterval) {
