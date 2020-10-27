@@ -14,12 +14,14 @@ interface IPowerOracle {
 
   function withdrawRewards(uint256 userId, address to) external;
 
+  function slasherUpdate(uint256 slasherId) external;
+
   /*** Owner Interface ***/
-  function setCvpAPY(uint256 cvpAPY_) external;
+  function setCvpAPY(uint256 cvpReportAPY_, uint256 cvpSlasherUpdateAPY_) external;
 
-  function setTotalReportsPerYear(uint256 totalReportsPerYear_) external;
+  function setTotalPerYear(uint256 totalReportsPerYear_, uint256 totalSlasherUpdatesPerYear_) external;
 
-  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_) external;
+  function setGasExpensesPerAssetReport(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_) external;
 
   function setGasPriceLimit(uint256 gasPriceLimit_) external;
 
