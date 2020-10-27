@@ -42,10 +42,30 @@ function expectPriceUpdateEvent(config) {
   })
 }
 
+function expectPriceToNotUpdateEvent(config) {
+  const { response, tokenSymbols, oldTimestamp, newTimestamp } = config;
+  tokenSymbols.forEach(symbol => {
+    expectEvent.notEmitted(response, 'AnchorPriceUpdated', {
+      symbol: symbol,
+      oldTimestamp,
+      newTimestamp
+    });
+  })
+}
+
 function expectMockedPriceUpdateEvent(config) {
   const { response, tokenSymbols } = config;
   tokenSymbols.forEach(symbol => {
     expectEvent(response, 'MockFetchMockedAnchorPrice', {
+      symbol: symbol
+    });
+  })
+}
+
+function expectMockedPriceToNotUpdateEvent(config) {
+  const { response, tokenSymbols } = config;
+  tokenSymbols.forEach(symbol => {
+    expectEvent.notEmitted(response, 'MockFetchMockedAnchorPrice', {
       symbol: symbol
     });
   })
@@ -201,16 +221,18 @@ describe('PowerOracle', function () {
       it('should update but not reward a reporter if there is not enough time passed from the last report', async function() {
         await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker, gasPrice: gwei(35) });
         await time.increase(10);
+        expect(await oracle.rewards(1)).to.be.equal(ether('0.8464'));
+
         const res = await oracle.pokeFromReporter(1, ['CVP', 'REP'], { from: validReporterPoker, gasPrice: gwei(35) });
         const resTimestamp = await getResTimestamp(res);
 
         expect(await oracle.rewards(1)).to.be.equal(ether('0.8464'));
 
-        expectMockedPriceUpdateEvent({
+        expectMockedPriceToNotUpdateEvent({
           response: res,
           tokenSymbols: ['ETH', 'CVP'],
         });
-        expectPriceUpdateEvent({
+        expectPriceToNotUpdateEvent({
           response: res,
           tokenSymbols: ['REP'],
           oldTimestamp: '0',
@@ -238,6 +260,9 @@ describe('PowerOracle', function () {
         // 2nd poke
         res = await oracle.pokeFromReporter(1, ['BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         expect(await oracle.rewards(1)).to.be.equal(ether('2.5392'));
+        expectEvent.notEmitted(res, 'RewardUser');
+        expectEvent.notEmitted(res, 'AnchorPriceUpdated');
+
         await time.increase(20);
 
         // 3rd poke
@@ -246,7 +271,7 @@ describe('PowerOracle', function () {
 
         expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
         // 19.2 + 12.8
-        expect(await oracle.rewards(1)).to.be.equal(ether('4.232'));
+        expect(await oracle.rewards(1)).to.be.equal(ether('5.0784'));
 
         expectMockedPriceUpdateEvent({
           response: res,
@@ -261,12 +286,12 @@ describe('PowerOracle', function () {
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '3',
-          rewardCount: '2'
+          rewardCount: '3'
         });
         expectEvent(res, 'RewardUser', {
           userId: '1',
-          count: '2',
-          calculatedReward: ether('1.6928')
+          count: '3',
+          calculatedReward: ether('2.5392')
         });
       });
 
@@ -374,7 +399,7 @@ describe('PowerOracle', function () {
       });
       expectPriceUpdateEvent({
         response: res,
-        tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
+        tokenSymbols: ['DAI', 'BTC'],
         oldTimestamp: firstTimestamp,
         newTimestamp: secondTimestamp
       });
@@ -402,7 +427,7 @@ describe('PowerOracle', function () {
 
       expectEvent.notEmitted(res, 'RewardUser');
 
-      expectPriceUpdateEvent({
+      expectPriceToNotUpdateEvent({
         response: res,
         tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
         oldTimestamp: '0',
@@ -453,16 +478,13 @@ describe('PowerOracle', function () {
       await time.increase(5);
 
       res = await oracle.poke(['REP', 'DAI', 'BTC'], { from: alice });
-      const secondTimestamp = await getResTimestamp(res);
       expectEvent(res, 'Poke', {
         poker: alice,
         tokenCount: '3',
       });
-      expectPriceUpdateEvent({
+      expectPriceToNotUpdateEvent({
         response: res,
-        tokenSymbols: ['ETH', 'REP', 'DAI', 'BTC'],
-        oldTimestamp: '0',
-        newTimestamp: secondTimestamp
+        tokenSymbols: ['ETH', 'REP', 'DAI', 'BTC', 'CVP']
       })
     });
 
