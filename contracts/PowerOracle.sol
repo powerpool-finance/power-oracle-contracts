@@ -291,7 +291,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     if (_rewardPaid) {
       require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
     } else {
-      require(delta >= maxReportInterval.sub(minReportInterval), "PowerOracle::_updateSlasherAndReward: bellow delta interval diffs");
+      require(delta >= maxReportInterval.sub(minReportInterval), "PowerOracle::_updateSlasherAndReward: bellow diff");
     }
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
