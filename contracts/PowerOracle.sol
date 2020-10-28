@@ -128,7 +128,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The current estimated gas expenses for reporting a single asset
   uint256 public gasExpensesPerAssetReport;
 
-  /// @notice The current estimated gas expenses for reporting a single asset
+  /// @notice The current estimated gas expenses for updating a slasher status
   uint256 public gasExpensesForSlasherStatusUpdate;
 
   /// @notice The maximum gas price to be used with gas compensation formula

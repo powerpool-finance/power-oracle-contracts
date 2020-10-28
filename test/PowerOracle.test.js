@@ -439,7 +439,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
 
       res = await oracle.slasherUpdate(2, { from: validSlasherPoker });
@@ -510,7 +510,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(secondTimestamp);
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
 
       const thirdTimestamp = await getResTimestamp(res);
 
@@ -541,10 +541,10 @@ describe('PowerOracle', function () {
 
       // 2nd poke
       await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
 
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
 
