@@ -509,6 +509,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   ) public view returns (uint256) {
     require(ethPrice_ > 0, "PowerOracle::calculateGasCompensation: ETH price is 0");
     require(cvpPrice_ > 0, "PowerOracle::calculateGasCompensation: CVP price is 0");
+    require(gasExpenses_ > 0, "PowerOracle::calculateGasCompensation: Gas expenses is 0");
 
     // return _min(tx.gasprice, gasPriceLimit) * gasExpensesPerAssetReport * ethPrice_ / cvpPrice_;
     return _min(tx.gasprice, gasPriceLimit).mul(gasExpenses_).mul(ethPrice_) / cvpPrice_;
@@ -526,6 +527,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   function calculateSlasherFixedReward(uint256 deposit_) public view returns (uint256) {
+    require(cvpSlasherUpdateAPY > 0, "PowerOracle: cvpSlasherUpdateAPY is 0");
+    require(totalSlasherUpdatesPerYear > 0, "PowerOracle: totalSlasherUpdatesPerYear is 0");
     return cvpSlasherUpdateAPY.mul(deposit_) / totalSlasherUpdatesPerYear / HUNDRED_PCT;
   }
 
