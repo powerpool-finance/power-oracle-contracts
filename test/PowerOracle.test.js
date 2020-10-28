@@ -414,7 +414,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(slasherUpdateTimestamp);
 
       await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow delta interval diffs');
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow diff');
 
       await time.increase(MAX_REPORT_INTERVAL_INT - MIN_REPORT_INTERVAL_INT);
 
