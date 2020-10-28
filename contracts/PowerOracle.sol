@@ -498,6 +498,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   function calculateReporterFixedReward(uint256 deposit_) public view returns (uint256) {
+    require(cvpReportAPY > 0, "PowerOracle: cvpReportAPY is 0");
+    require(totalReportsPerYear > 0, "PowerOracle: totalReportsPerYear is 0");
     // return cvpReportAPY * deposit_ / totalReportsPerYear / HUNDRED_PCT;
     return cvpReportAPY.mul(deposit_) / totalReportsPerYear / HUNDRED_PCT;
   }
