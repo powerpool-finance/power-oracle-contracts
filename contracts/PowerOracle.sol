@@ -281,14 +281,18 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 _ethPrice,
     uint256 _cvpPrice
   ) internal {
-    _updateSlasherTimestamp(_slasherId);
+    _updateSlasherTimestamp(_slasherId, true);
     _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
   }
 
-  function _updateSlasherTimestamp(uint256 _slasherId) internal {
+  function _updateSlasherTimestamp(uint256 _slasherId, bool _rewardPaid) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
     uint256 delta = block.timestamp.sub(prevSlasherUpdate);
-    require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
+    if (_rewardPaid) {
+      require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
+    } else {
+      require(delta >= maxReportInterval.sub(minReportInterval), "PowerOracle::_updateSlasherAndReward: bellow delta interval diffs");
+    }
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
   }
@@ -346,7 +350,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     if (overdueCount > 0) {
       powerOracleStaking.slash(slasherId_, overdueCount);
       _rewardUser(slasherId_, overdueCount, ethPrice, cvpPrice);
-      _updateSlasherTimestamp(slasherId_);
+      _updateSlasherTimestamp(slasherId_, false);
     } else {
       _updateSlasherAndReward(slasherId_, ethPrice, cvpPrice);
     }
