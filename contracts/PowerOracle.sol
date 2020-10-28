@@ -288,7 +288,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function _updateSlasherTimestamp(uint256 _slasherId) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
     uint256 delta = block.timestamp.sub(prevSlasherUpdate);
-    require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval");
+    require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
   }
