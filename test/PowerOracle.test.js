@@ -1,6 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
-const { getTokenConfigs  } = require('./localHelpers');
+const { getTokenConfigs } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
 
@@ -397,11 +397,19 @@ describe('PowerOracle', function () {
       const firstTimestamp = await getResTimestamp(res);
 
       // 2nd poke
-      await oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker });
+      res = await oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP', 'REP'],
+        oldTimestamp: firstTimestamp,
+        newTimestamp: secondTimestamp
+      });
 
       // 3rd poke
       res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker });
-      const secondTimestamp = await getResTimestamp(res);
+      const thirdTimestamp = await getResTimestamp(res);
 
       expectEvent.notEmitted(res, 'RewardUserSlasherUpdate');
       expectEvent(res, 'PokeFromSlasher', {
@@ -420,13 +428,31 @@ describe('PowerOracle', function () {
         response: res,
         tokenSymbols: ['DAI', 'BTC'],
         oldTimestamp: firstTimestamp,
-        newTimestamp: secondTimestamp
+        newTimestamp: thirdTimestamp
       });
 
       expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
         overdueCount: '2'
       });
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
+
+      await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+      await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+
+      res = await oracle.slasherUpdate(2, { from: validSlasherPoker });
+      const fourthTimestamp = await getResTimestamp(res);
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(fourthTimestamp);
+
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP'],
+        oldTimestamp: secondTimestamp,
+        newTimestamp: fourthTimestamp
+      })
     });
 
     it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
@@ -468,6 +494,66 @@ describe('PowerOracle', function () {
       expect(logs.length).to.be.equal(0);
     });
 
+    it('slasherUpdate should works correctly', async function() {
+      // 1st poke
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await time.increase(5);
+      const firstTimestamp = await getResTimestamp(res);
+
+      await expect(oracle.pokeFromSlasher(1, ['CVP', 'REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) }))
+        .to.be.revertedWith('PowerOracleStaking::authorizeSlasher: User is reporter');
+
+      // 2nd poke
+      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(secondTimestamp);
+
+      await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+
+      const thirdTimestamp = await getResTimestamp(res);
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
+      await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+
+      res = await oracle.slasherUpdate(2, { from: validSlasherPoker });
+
+      const fourthTimestamp = await getResTimestamp(res);
+
+      expectPriceUpdateEvent({
+        response: res,
+        tokenSymbols: ['ETH', 'CVP'],
+        oldTimestamp: firstTimestamp,
+        newTimestamp: fourthTimestamp
+      })
+    });
+
+    it('should revert slasherUpdate when delta bellow maxReportInterval', async function() {
+      // 1st poke
+      let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await time.increase(5);
+
+      res = await oracle.slasherUpdate(2, { from: validSlasherPoker });
+      const secondTimestamp = await getResTimestamp(res);
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(secondTimestamp);
+
+      // 2nd poke
+      await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+
+      await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval');
+
+      await time.increase(MAX_REPORT_INTERVAL_INT + 5);
+
+      res = await oracle.slasherUpdate(2, { from: validSlasherPoker });
+      const thirdTimestamp = await getResTimestamp(res);
+
+      expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
+    });
+
     it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
       await oracle.mockSetAnchorPrice('ETH', mwei('320'));
       await oracle.mockSetAnchorPrice('CVP', mwei('5'));
@@ -495,6 +581,11 @@ describe('PowerOracle', function () {
         .to.be.revertedWith('PowerOracleStaking::authorizeSlasher: Invalid poker key');
     });
 
+    it('should deny another user calling a slasherUpdate', async function() {
+      await expect(oracle.slasherUpdate(2, { from: alice }))
+        .to.be.revertedWith('PowerOracleStaking::authorizeSlasher: Invalid poker key');
+    });
+
     it('should deny calling with an empty array', async function() {
       await expect(oracle.pokeFromSlasher(2, [], { from: validSlasherPoker }))
         .to.be.revertedWith('PowerOracle::pokeFromSlasher: Missing token symbols');
@@ -508,6 +599,12 @@ describe('PowerOracle', function () {
     it('should deny poking when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(2, ['REP'], { from: validSlasherPoker }))
+        .to.be.revertedWith('Pausable: paused');
+    });
+
+    it('should deny slasher updating when the contract is paused', async function() {
+      await oracle.pause({ from: owner });
+      await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
         .to.be.revertedWith('Pausable: paused');
     });
   });

@@ -281,16 +281,14 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 _ethPrice,
     uint256 _cvpPrice
   ) internal {
-    uint256 delta = block.timestamp.sub(lastSlasherUpdates[_slasherId]);
-    if (delta < maxReportInterval) {
-      return;
-    }
-    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
     _updateSlasherTimestamp(_slasherId);
+    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
   }
 
   function _updateSlasherTimestamp(uint256 _slasherId) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
+    uint256 delta = block.timestamp.sub(prevSlasherUpdate);
+    require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: delta bellow maxReportInterval");
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
   }
