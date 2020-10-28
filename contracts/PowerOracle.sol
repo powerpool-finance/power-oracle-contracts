@@ -116,20 +116,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The planned yield from a deposit in CVP tokens
   uint256 public cvpReportAPY;
 
-  /// @notice The planned yield from a deposit in CVP tokens
-  uint256 public cvpSlasherUpdateAPY;
-
   /// @notice The total number of reports for all pairs per year
   uint256 public totalReportsPerYear;
 
-  /// @notice The total number of slashers update per year
-  uint256 public totalSlasherUpdatesPerYear;
-
   /// @notice The current estimated gas expenses for reporting a single asset
   uint256 public gasExpensesPerAssetReport;
-
-  /// @notice The current estimated gas expenses for updating a slasher status
-  uint256 public gasExpensesForSlasherStatusUpdate;
 
   /// @notice The maximum gas price to be used with gas compensation formula
   uint256 public gasPriceLimit;
@@ -142,6 +133,15 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   /// @notice Last slasher update time by a user ID
   mapping(uint256 => uint256) public lastSlasherUpdates;
+
+  /// @notice The current estimated gas expenses for updating a slasher status
+  uint256 public gasExpensesForSlasherStatusUpdate;
+
+  /// @notice The planned yield from a deposit in CVP tokens
+  uint256 public cvpSlasherUpdateAPY;
+
+  /// @notice The total number of slashers update per year
+  uint256 public totalSlasherUpdatesPerYear;
 
   constructor(
     address cvpToken_,
