@@ -423,6 +423,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
       "PowerOracleStaking::authorizeSlasher: Insufficient deposit"
     );
     require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeSlasher: Invalid poker key");
+    require(userId_ != _reporterId, "PowerOracleStaking::authorizeSlasher: User is reporter");
   }
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {

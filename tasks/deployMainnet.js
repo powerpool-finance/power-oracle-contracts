@@ -66,7 +66,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     function getTokenConfigs() {
       let custom = [
-        {cToken: address(1), underlying: tokens['WETH'], symbol: 'ETH', symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: false},
+        {cToken: address(1), underlying: tokens['WETH'], symbol: 'ETH', symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, uniswapMarket: pairBySymbol['USDC'], isUniswapReversed: true},
         {cToken: address(2), underlying: tokens['USDT'], symbol: 'USDT', symbolHash: keccak256('USDT'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
         {cToken: address(3), underlying: tokens['USDC'], symbol: 'USDC', symbolHash: keccak256('USDC'), baseUnit: uint(1e6), priceSource: PriceSource.FIXED_USD, fixedPrice: uint(1e6), uniswapMarket: address(0), isUniswapReversed: false},
       ];
