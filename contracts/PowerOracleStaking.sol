@@ -437,7 +437,7 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     require(users[userId_].adminKey == adminKey_, "PowerOracleStaking::requireValidAdminKey: Invalid admin key");
   }
 
-  function getLastDepositChange(uint256 userId_) external view override returns(uint256) {
+  function getLastDepositChange(uint256 userId_) external view override returns (uint256) {
     return _lastDepositChange[userId_];
   }
 }
