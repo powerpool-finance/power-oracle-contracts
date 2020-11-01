@@ -304,6 +304,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function _updateSlasherTimestamp(uint256 _slasherId, bool _rewardPaid) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
     uint256 delta = block.timestamp.sub(prevSlasherUpdate);
+
+    uint256 lastDepositChange = powerOracleStaking.getLastDepositChange(_slasherId);
+    uint256 depositChangeDelta = block.timestamp.sub(lastDepositChange);
+    require(depositChangeDelta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta");
+
     if (_rewardPaid) {
       require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
     } else {

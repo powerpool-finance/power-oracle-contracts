@@ -80,14 +80,14 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink;
+  let deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink;
 
   before(async function() {
-    [deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
+    [deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
-    cvpToken = await MockCVP.new(ether(100000));
+    cvpToken = await MockCVP.new(ether(1000000));
     staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
       StubOracle,
@@ -356,9 +356,12 @@ describe('PowerOracle', function () {
         { proxyAdminOwner: owner }
       );
 
-      await staking.mockSetUser(1, alice, validReporterPoker, ether(300));
-      await staking.mockSetReporter(1, ether(300));
-      await staking.mockSetUser(2, alice, validSlasherPoker, ether(100));
+      await cvpToken.transfer(alice, ether(400), { from: deployer });
+      await cvpToken.approve(staking.address, ether(400), { from: alice });
+      await staking.createUser(alice, validReporterPoker, ether(300), { from: alice });
+      await staking.createUser(alice, validSlasherPoker, ether(100), { from: alice });
+
+      await time.increase(MAX_REPORT_INTERVAL_INT + 1);
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
@@ -547,6 +550,51 @@ describe('PowerOracle', function () {
         oldTimestamp: firstTimestamp,
         newTimestamp: fourthTimestamp
       })
+    });
+
+    it('sshould deny slasherUpdate right after deposit or withdraw', async function() {
+      // 1st poke
+      await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await time.increase(5);
+
+      await cvpToken.transfer(dan, ether(1000), { from: deployer });
+      await cvpToken.approve(staking.address, ether(30), { from: dan });
+
+      await staking.createUser(dan, danSlasher, ether(30), { from: dan });
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MIN_REPORT_INTERVAL_INT);
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MAX_REPORT_INTERVAL - MIN_REPORT_INTERVAL_INT);
+
+      let res = await oracle.slasherUpdate(3, { from: danSlasher });
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '3'
+      });
+
+      await time.increase(MAX_REPORT_INTERVAL + 1);
+
+      await staking.withdraw('3', dan, ether(1), { from: dan });
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MIN_REPORT_INTERVAL_INT);
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MAX_REPORT_INTERVAL - MIN_REPORT_INTERVAL_INT);
+
+      res = await oracle.slasherUpdate(3, { from: danSlasher });
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '3'
+      });
     });
 
     it('should revert slasherUpdate when delta bellow maxReportInterval', async function() {
