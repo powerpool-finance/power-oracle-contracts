@@ -26,7 +26,8 @@ const CVP_SLASHER_UPDATE_APY = ether(10);
 const TOTAL_REPORTS_PER_YEAR = '90000';
 const TOTAL_SLASHER_UPDATES_PER_YEAR = '50000';
 const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
-const GAS_EXPENSES_FOR_SLASHER_UPDATE = '117500';
+const GAS_EXPENSES_FOR_SLASHER_UPDATE = '84000';
+const GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE = '117500';
 const GAS_PRICE_LIMIT = gwei(1000);
 const ANCHOR_PERIOD = '45';
 const MIN_REPORT_INTERVAL = '30';
@@ -91,7 +92,7 @@ describe('PowerOracle', function () {
     oracle = await deployProxied(
       StubOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
     );
 
@@ -111,13 +112,14 @@ describe('PowerOracle', function () {
       expect(await oracle.totalSlasherUpdatesPerYear()).to.be.equal(TOTAL_SLASHER_UPDATES_PER_YEAR);
       expect(await oracle.gasExpensesPerAssetReport()).to.be.equal(GAS_EXPENSES_PER_ASSET_REPORT);
       expect(await oracle.gasExpensesForSlasherStatusUpdate()).to.be.equal(GAS_EXPENSES_FOR_SLASHER_UPDATE);
+      expect(await oracle.gasExpensesForSlasherPokeStatusUpdate()).to.be.equal(GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE);
       expect(await oracle.gasPriceLimit()).to.be.equal(GAS_PRICE_LIMIT);
       expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
       expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
     });
 
     it('should deny initializing again', async function() {
-      await expect(oracle.initialize(owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
+      await expect(oracle.initialize(owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })
@@ -163,7 +165,7 @@ describe('PowerOracle', function () {
         oracle = await deployProxied(
           MockOracle,
           [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-          [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+          [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
           { proxyAdminOwner: owner }
         );
         await staking.setPowerOracle(oracle.address, { from: deployer });
@@ -350,7 +352,7 @@ describe('PowerOracle', function () {
       oracle = await deployProxied(
         MockOracle,
         [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
         { proxyAdminOwner: owner }
       );
 
@@ -572,7 +574,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
     });
 
-    it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
+    it('should receive correct reward by slasherUpdate method', async function() {
       await oracle.mockSetAnchorPrice('ETH', mwei('320'));
       await oracle.mockSetAnchorPrice('CVP', mwei('5'));
       // 1st poke
@@ -588,7 +590,7 @@ describe('PowerOracle', function () {
 
       expectEvent(res, 'RewardUserSlasherUpdate', {
         slasherId: '2',
-        calculatedReward: ether(0.2634)
+        calculatedReward: ether(0.18836)
       });
 
       expectEvent.notEmitted(res, 'RewardUserReport');
@@ -729,13 +731,14 @@ describe('PowerOracle', function () {
 
     describe('setGasExpenses', () => {
       it('should allow the owner setting a new value', async function() {
-        await oracle.setGasExpenses(42, 22, { from: owner });
+        await oracle.setGasExpenses(42, 22, 32, { from: owner });
         expect(await oracle.gasExpensesPerAssetReport()).to.be.equal('42');
         expect(await oracle.gasExpensesForSlasherStatusUpdate()).to.be.equal('22');
+        expect(await oracle.gasExpensesForSlasherPokeStatusUpdate()).to.be.equal('32');
       });
 
       it('should deny non-reporter calling the method', async function() {
-        await expect(oracle.setGasExpenses(42, 22, { from: alice }))
+        await expect(oracle.setGasExpenses(42, 22, 32, { from: alice }))
           .to.be.revertedWith('Ownable: caller is not the owner');
       });
     });
@@ -851,7 +854,7 @@ describe('PowerOracle', function () {
         await oracle.setCvpAPY(ether(20), ether(10), { from: owner });
         await oracle.setTotalPerYear(90000, 50000, { from: owner });
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 117500, { from: owner });
+        await oracle.setGasExpenses(110000, 84000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {
@@ -893,7 +896,7 @@ describe('PowerOracle', function () {
     describe('calculateGasCompensation', () => {
       beforeEach(async function() {
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 117500, { from: owner });
+        await oracle.setGasExpenses(110000, 84000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {
