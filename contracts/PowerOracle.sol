@@ -102,6 +102,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The event emitted when the owner updates the gasPriceLimit value
   event SetGasPriceLimit(uint256 gasPriceLimit);
 
+  /// @notice The event emitted when an admin withdraw his reward
+  event WithdrawRewards(uint256 indexed userId, address indexed to, uint256 amount);
+
   /// @notice CVP token address
   IERC20 public immutable cvpToken;
 
@@ -414,6 +417,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     rewards[userId_] = 0;
 
     cvpToken.transferFrom(reservoir, to_, rewardAmount);
+
+    emit WithdrawRewards(userId_, to_, rewardAmount);
   }
 
   /*** Owner Interface ***/
