@@ -111,6 +111,9 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
   /// @notice User details by it's ID
   mapping(uint256 => User) public users;
 
+  /// @notice Last deposit change timestamp by user ID
+  mapping(uint256 => uint256) public _lastDepositChange;
+
   constructor(address cvpToken_, address reservoir_) public {
     cvpToken = IERC20(cvpToken_);
     reservoir = reservoir_;
@@ -150,6 +153,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     uint256 depositAfter = user.deposit.add(amount_);
     user.deposit = depositAfter;
     totalDeposit = totalDeposit.add(amount_);
+
+    _lastDepositChange[userId_] = block.timestamp;
 
     _trySetReporter(userId_, depositAfter);
 
@@ -198,6 +203,8 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
     uint256 depositAfter = depositBefore - amount_;
     users[userId_].deposit = depositAfter;
     totalDeposit = totalDeposit.sub(amount_);
+
+    _lastDepositChange[userId_] = block.timestamp;
 
     emit Withdraw(userId_, msg.sender, to_, amount_, depositAfter);
     cvpToken.transfer(to_, amount_);
@@ -428,5 +435,9 @@ contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Paus
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
     require(users[userId_].adminKey == adminKey_, "PowerOracleStaking::requireValidAdminKey: Invalid admin key");
+  }
+
+  function getLastDepositChange(uint256 userId_) external view override returns (uint256) {
+    return _lastDepositChange[userId_];
   }
 }
