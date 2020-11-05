@@ -40,6 +40,8 @@ const config = {
   networks: {
     buidlerevm: {
       chainId: 31337,
+      gas: 12e6,
+      blockGasLimit: 12e6
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
