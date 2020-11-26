@@ -23,7 +23,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
   bytes32 internal constant rotateHash = keccak256(abi.encodePacked("rotate"));
 
   /// @notice The event emitted when anchor price is updated
-  event AnchorPriceUpdated(string indexed symbol, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
+  event AnchorPriceUpdated(string symbol, bytes32 indexed symbolHash, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
 
   /// @notice The event emitted when the uniswap window changes
   event UniswapWindowUpdated(bytes32 indexed symbolHash, uint oldTimestamp, uint newTimestamp, uint oldPrice, uint newPrice);
@@ -118,7 +118,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
       anchorPrice = mul(unscaledPriceMantissa, config.baseUnit) / ethBaseUnit / expScale;
     }
 
-    emit AnchorPriceUpdated(symbol, anchorPrice, oldTimestamp, block.timestamp);
+    emit AnchorPriceUpdated(symbol, keccak256(abi.encodePacked(symbol)), anchorPrice, oldTimestamp, block.timestamp);
 
     return anchorPrice;
   }
