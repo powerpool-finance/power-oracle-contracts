@@ -72,13 +72,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 calculatedReward
   );
 
+  /// @notice The event emitted when the slasher timestamps are updated
   event UpdateSlasher(uint256 indexed slasherId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
 
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
   event NothingToReward(uint256 indexed userId, uint256 ethPrice);
-
-  /// @notice The event emitted when the stored price is updated
-  event PriceUpdated(string symbol, uint256 price);
 
   /// @notice The event emitted when the owner updates the cvpReportAPY value
   event SetCvpApy(uint256 cvpReportAPY, uint256 cvpSlasherUpdateAPY);

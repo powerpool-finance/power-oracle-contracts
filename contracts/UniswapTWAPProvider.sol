@@ -23,7 +23,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
   bytes32 internal constant rotateHash = keccak256(abi.encodePacked("rotate"));
 
   /// @notice The event emitted when anchor price is updated
-  event AnchorPriceUpdated(string symbol, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
+  event AnchorPriceUpdated(string indexed symbol, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
 
   /// @notice The event emitted when the uniswap window changes
   event UniswapWindowUpdated(bytes32 indexed symbolHash, uint oldTimestamp, uint newTimestamp, uint oldPrice, uint newPrice);
