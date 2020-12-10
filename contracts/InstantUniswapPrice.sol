@@ -6,6 +6,7 @@ pragma experimental ABIEncoderV2;
 import "./Uniswap/UniswapV2Library.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
+import "./interfaces/BPoolInterface.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -16,33 +17,63 @@ contract InstantUniswapPrice {
   address public constant USDC_MARKET = 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc;
   address public constant UNISWAP_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
 
+  function balancerPoolUsdTokensSum(address _balancerPool) public view returns (uint) {
+    (address[] memory tokens, uint256[] memory balances) = _getBalancerTokensAndBalances(_balancerPool);
+    return usdcTokensSum(tokens, balances);
+  }
+
+  function balancerPoolEthTokensSum(address _balancerPool) public view returns (uint) {
+    (address[] memory tokens, uint256[] memory balances) = _getBalancerTokensAndBalances(_balancerPool);
+    return ethTokensSum(tokens, balances);
+  }
+
+  function usdcTokensSum(address[] memory _tokens, uint256[] memory _balances) public view returns (uint) {
+    uint256 ethTokensSumAmount = ethTokensSum(_tokens, _balances);
+    uint256 ethPriceInUsdc = currentEthPriceInUsdc();
+    return ethTokensSumAmount.mul(ethPriceInUsdc).div(1 ether);
+  }
+
+  function ethTokensSum(address[] memory _tokens, uint256[] memory _balances) public view returns (uint) {
+    uint256 len = _tokens.length;
+    require(len == _balances.length, "LENGTHS_NOT_EQUAL");
+
+    uint256 sum = 0;
+    for (uint256 i = 0; i < len; i++) {
+      sum = sum.add(currentTokenEthPrice(_tokens[i]).mul(_balances[i]).div(1 ether));
+    }
+    return sum;
+  }
+
   function currentEthPriceInUsdc() public view returns (uint) {
     return currentTokenPrice(USDC_MARKET, WETH_TOKEN);
   }
 
-  function currentTokenUsdcPrice(address token) public view returns (uint price) {
+  function currentTokenUsdcPrice(address _token) public view returns (uint price) {
     uint256 ethPriceInUsdc = currentEthPriceInUsdc();
-    uint256 tokenEthPrice = currentTokenEthPrice(token);
+    uint256 tokenEthPrice = currentTokenEthPrice(_token);
     return tokenEthPrice.mul(ethPriceInUsdc).div(1 ether);
   }
 
-  function currentTokenEthPrice(address token) public view returns (uint price) {
-    address market = IUniswapV2Factory(UNISWAP_FACTORY).getPair(token, WETH_TOKEN);
+  function currentTokenEthPrice(address _token) public view returns (uint price) {
+    if (_token == WETH_TOKEN) {
+      return uint(1 ether);
+    }
+    address market = IUniswapV2Factory(UNISWAP_FACTORY).getPair(_token, WETH_TOKEN);
     if (market == address(0)) {
-      market = IUniswapV2Factory(UNISWAP_FACTORY).getPair(WETH_TOKEN, token);
-      return currentTokenPrice(market, token);
+      market = IUniswapV2Factory(UNISWAP_FACTORY).getPair(WETH_TOKEN, _token);
+      return currentTokenPrice(market, _token);
     } else {
-      return currentTokenPrice(market, token);
+      return currentTokenPrice(market, _token);
     }
   }
 
-  function currentTokenPrice(address uniswapMarket, address token) public view returns (uint price) {
+  function currentTokenPrice(address uniswapMarket, address _token) public view returns (uint price) {
     (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(uniswapMarket).getReserves();
     address token0 = IUniswapV2Pair(uniswapMarket).token0();
     address token1 = IUniswapV2Pair(uniswapMarket).token1();
 
     uint8 decimals;
-    try ERC20(token == token0 ? token1 : token0).decimals() returns (uint8 _decimals) {
+    try ERC20(_token == token0 ? token1 : token0).decimals() returns (uint8 _decimals) {
       decimals = _decimals;
     } catch (bytes memory /*lowLevelData*/) {
       decimals = uint8(18);
@@ -50,12 +81,25 @@ contract InstantUniswapPrice {
 
     price = UniswapV2Library.getAmountOut(
       1 ether,
-      token == token0 ? reserve0 : reserve1,
-      token == token0 ? reserve1 : reserve0
+      _token == token0 ? reserve0 : reserve1,
+      _token == token0 ? reserve1 : reserve0
     );
 
     if (decimals != 18) {
       price = price.mul(10 ** uint256((uint8(18) - decimals)));
+    }
+  }
+
+  function _getBalancerTokensAndBalances(address _balancerPool)
+    view internal
+    returns(address[] memory tokens, uint256[] memory balances)
+  {
+    tokens = BPoolInterface(_balancerPool).getCurrentTokens();
+    uint256 len = tokens.length;
+
+    balances = new uint256[](len);
+    for (uint256 i = 0; i < len; i++) {
+      balances[i] = BPoolInterface(_balancerPool).getBalance(tokens[i]);
     }
   }
 }
