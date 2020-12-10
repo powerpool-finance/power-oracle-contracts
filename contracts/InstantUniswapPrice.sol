@@ -2,12 +2,12 @@
 
 pragma solidity ^0.6.12;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Uniswap/UniswapV2Library.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./interfaces/BPoolInterface.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./interfaces/IERC20Detailed.sol";
 
 contract InstantUniswapPrice {
   using SafeMath for uint256;
@@ -123,12 +123,12 @@ contract InstantUniswapPrice {
     uint256 len = tokens.length;
     balances = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
-      balances[i] = ERC20(tokens[i]).balanceOf(_contract);
+      balances[i] = IERC20Detailed(tokens[i]).balanceOf(_contract);
     }
   }
 
   function getTokenDecimals(address _token) public view returns(uint8 decimals) {
-    try ERC20(_token).decimals() returns (uint8 _decimals) {
+    try IERC20Detailed(_token).decimals() returns (uint8 _decimals) {
       decimals = _decimals;
     } catch (bytes memory /*lowLevelData*/) {
       decimals = uint8(18);
