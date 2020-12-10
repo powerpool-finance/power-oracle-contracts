@@ -18,12 +18,12 @@ contract InstantUniswapPrice {
   address public constant UNISWAP_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
 
   function balancerPoolUsdTokensSum(address _balancerPool) public view returns (uint) {
-    (address[] memory tokens, uint256[] memory balances) = _getBalancerTokensAndBalances(_balancerPool);
+    (address[] memory tokens, uint256[] memory balances) = getBalancerTokensAndBalances(_balancerPool);
     return usdcTokensSum(tokens, balances);
   }
 
   function balancerPoolEthTokensSum(address _balancerPool) public view returns (uint) {
-    (address[] memory tokens, uint256[] memory balances) = _getBalancerTokensAndBalances(_balancerPool);
+    (address[] memory tokens, uint256[] memory balances) = getBalancerTokensAndBalances(_balancerPool);
     return ethTokensSum(tokens, balances);
   }
 
@@ -39,6 +39,7 @@ contract InstantUniswapPrice {
 
     uint256 sum = 0;
     for (uint256 i = 0; i < len; i++) {
+      _balances[i] = amountToEther(_balances[i], getTokenDecimals(_tokens[i]));
       sum = sum.add(currentTokenEthPrice(_tokens[i]).mul(_balances[i]).div(1 ether));
     }
     return sum;
@@ -72,26 +73,29 @@ contract InstantUniswapPrice {
     address token0 = IUniswapV2Pair(uniswapMarket).token0();
     address token1 = IUniswapV2Pair(uniswapMarket).token1();
 
-    uint8 decimals;
-    try ERC20(_token == token0 ? token1 : token0).decimals() returns (uint8 _decimals) {
-      decimals = _decimals;
-    } catch (bytes memory /*lowLevelData*/) {
-      decimals = uint8(18);
+    uint8 tokenInDecimals = getTokenDecimals(_token);
+    uint8 tokenOutDecimals = getTokenDecimals(_token == token0 ? token1 : token0);
+
+    uint256 inAmount = 1 ether;
+    if (tokenInDecimals < uint8(18)) {
+      inAmount = inAmount.div(10 ** uint256(uint8(18) - tokenInDecimals));
     }
 
     price = UniswapV2Library.getAmountOut(
-      1 ether,
+      inAmount,
       _token == token0 ? reserve0 : reserve1,
       _token == token0 ? reserve1 : reserve0
     );
 
-    if (decimals != 18) {
-      price = price.mul(10 ** uint256((uint8(18) - decimals)));
+    if (tokenInDecimals > tokenOutDecimals) {
+      return price.mul(10 ** uint256(tokenInDecimals - tokenOutDecimals));
+    } else {
+      return price;
     }
   }
 
-  function _getBalancerTokensAndBalances(address _balancerPool)
-    view internal
+  function getBalancerTokensAndBalances(address _balancerPool)
+    view public
     returns(address[] memory tokens, uint256[] memory balances)
   {
     tokens = BPoolInterface(_balancerPool).getCurrentTokens();
@@ -101,5 +105,20 @@ contract InstantUniswapPrice {
     for (uint256 i = 0; i < len; i++) {
       balances[i] = BPoolInterface(_balancerPool).getBalance(tokens[i]);
     }
+  }
+
+  function getTokenDecimals(address _token) view public returns(uint8 decimals) {
+    try ERC20(_token).decimals() returns (uint8 _decimals) {
+      decimals = _decimals;
+    } catch (bytes memory /*lowLevelData*/) {
+      decimals = uint8(18);
+    }
+  }
+
+  function amountToEther(uint256 amount, uint8 decimals) view public returns(uint256) {
+    if (decimals == uint8(18)) {
+      return amount;
+    }
+    return amount.mul(10 ** uint256(uint8(18) - decimals));
   }
 }
