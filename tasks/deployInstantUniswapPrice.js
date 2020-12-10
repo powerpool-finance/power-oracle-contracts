@@ -27,6 +27,9 @@ task('deploy-instant-uniswap-price', 'Deploy instant uniswap price')
     console.log('instantPrice.balancerPoolUsdTokensSum YETI', web3.utils.fromWei(await instantPrice.balancerPoolUsdTokensSum('0xb4bebd34f6daafd808f73de0d10235a92fbb6c3d'), 'ether'));
 
     console.log('instantPrice.balancerPoolUsdTokensSum BTC-WETH', web3.utils.fromWei(await instantPrice.balancerPoolUsdTokensSum('0x1eff8af5d577060ba4ac8a29a13525bb0ee2a3d5'), 'ether'));
+    console.log('instantPrice.balancerPoolEthTokensSum BTC-WETH', web3.utils.fromWei(await instantPrice.balancerPoolEthTokensSum('0x1eff8af5d577060ba4ac8a29a13525bb0ee2a3d5'), 'ether'));
+    console.log('instantPrice.contractUsdTokensSum BTC-WETH', web3.utils.fromWei(await instantPrice.contractUsdTokensSum('0x1eff8af5d577060ba4ac8a29a13525bb0ee2a3d5', ['0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2']), 'ether'));
+    console.log('instantPrice.contractEthTokensSum BTC-WETH', web3.utils.fromWei(await instantPrice.contractEthTokensSum('0x1eff8af5d577060ba4ac8a29a13525bb0ee2a3d5', ['0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2']), 'ether'));
     console.log('instantPrice.amountToEther BTC', web3.utils.fromWei(await instantPrice.amountToEther('302627813983', '8'), 'ether'));
     console.log('instantPrice.ethTokensSum BTC', web3.utils.fromWei(await instantPrice.ethTokensSum(['0x2260fac5e5542a773aa44fbcfedf7c193bc2c599'], ['302627813983']), 'ether'));
     console.log('instantPrice.usdcTokensSum BTC', web3.utils.fromWei(await instantPrice.usdcTokensSum(['0x2260fac5e5542a773aa44fbcfedf7c193bc2c599'], ['302627813983']), 'ether'));

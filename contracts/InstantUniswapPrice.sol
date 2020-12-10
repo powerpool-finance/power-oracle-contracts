@@ -17,6 +17,16 @@ contract InstantUniswapPrice {
   address public constant USDC_MARKET = 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc;
   address public constant UNISWAP_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
 
+  function contractUsdTokensSum(address _contract, address[] memory _tokens) public view returns (uint) {
+    uint256[] memory balances = getContractTokensBalanceOfArray(_contract, _tokens);
+    return usdcTokensSum(_tokens, balances);
+  }
+
+  function contractEthTokensSum(address _contract, address[] memory _tokens) public view returns (uint) {
+    uint256[] memory balances = getContractTokensBalanceOfArray(_contract, _tokens);
+    return ethTokensSum(_tokens, balances);
+  }
+
   function balancerPoolUsdTokensSum(address _balancerPool) public view returns (uint) {
     (address[] memory tokens, uint256[] memory balances) = getBalancerTokensAndBalances(_balancerPool);
     return usdcTokensSum(tokens, balances);
@@ -104,6 +114,17 @@ contract InstantUniswapPrice {
     balances = new uint256[](len);
     for (uint256 i = 0; i < len; i++) {
       balances[i] = BPoolInterface(_balancerPool).getBalance(tokens[i]);
+    }
+  }
+
+  function getContractTokensBalanceOfArray(address _contract, address[] memory tokens)
+    view public
+    returns(uint256[] memory balances)
+  {
+    uint256 len = tokens.length;
+    balances = new uint256[](len);
+    for (uint256 i = 0; i < len; i++) {
+      balances[i] = ERC20(tokens[i]).balanceOf(_contract);
     }
   }
 
