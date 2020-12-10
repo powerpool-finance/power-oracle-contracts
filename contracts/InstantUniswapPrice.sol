@@ -135,7 +135,7 @@ contract InstantUniswapPrice {
     }
   }
 
-  function amountToEther(uint256 amount, uint8 decimals) public view returns(uint256) {
+  function amountToEther(uint256 amount, uint8 decimals) public pure returns(uint256) {
     if (decimals == uint8(18)) {
       return amount;
     }
