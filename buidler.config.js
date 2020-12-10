@@ -8,6 +8,7 @@ usePlugin('buidler-gas-reporter');
 require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
+require('./tasks/redeployOracleImplementation')
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
@@ -43,8 +44,15 @@ const config = {
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
-      gasPrice: 41000000000,
+      gasPrice: 45 * 10 ** 9,
       accounts: getAccounts('mainnet')
+    },
+    mainnetfork: {
+      url: 'http://127.0.0.1:8545/',
+      accounts: getAccounts('mainnet'),
+      gasPrice: 45 * 10 ** 9,
+      gasMultiplier: 1.5,
+      timeout: 2000000,
     },
     local: {
       url: 'http://127.0.0.1:8545',
