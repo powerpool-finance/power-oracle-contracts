@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
 
-import "../interfaces/IUniswapV2Pair.sol";
-
 pragma solidity ^0.6.10;
 
 // Based on code from https://github.com/Uniswap/uniswap-v2-periphery
@@ -61,4 +59,10 @@ library UniswapV2OracleLibrary {
             price1Cumulative += uint(FixedPoint.fraction(reserve0, reserve1)._x) * timeElapsed;
         }
     }
+}
+
+interface IUniswapV2Pair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function price0CumulativeLast() external view returns (uint);
+    function price1CumulativeLast() external view returns (uint);
 }
