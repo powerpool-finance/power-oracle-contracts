@@ -1,8 +1,5 @@
 /* global usePlugin, task */
 
-const pIteration = require('p-iteration');
-const _ = require('lodash');
-
 usePlugin('@nomiclabs/buidler-truffle5');
 
 task('deploy-instant-uniswap-price', 'Deploy instant uniswap price')
