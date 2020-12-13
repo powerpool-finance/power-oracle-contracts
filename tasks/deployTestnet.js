@@ -1,5 +1,5 @@
-/* global usePlugin, task */
-usePlugin('@nomiclabs/buidler-truffle5');
+/* global task */
+require('@nomiclabs/hardhat-truffle5');
 
 
 task('deploy-testnet', 'Deploys testnet contracts')
