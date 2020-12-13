@@ -1,13 +1,13 @@
-/* global usePlugin, task */
+/* global task */
 
-usePlugin('@nomiclabs/buidler-truffle5');
+require('@nomiclabs/hardhat-truffle5');
+require('@nomiclabs/hardhat-ethers');
 
-const fs = require('fs');
 const pIteration = require('p-iteration');
 
 task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
-  .setAction(async () => {
-    const { keccak256 } = require('../test/helpers');
+  .setAction(async (_, {ethers}) => {
+    const { keccak256, forkContractUpgrade, deployAndSaveArgs, increaseTime } = require('../test/helpers');
     const PowerOracle = artifacts.require('PowerOracle');
     PowerOracle.numberFormat = 'String';
 
@@ -39,19 +39,45 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
         isUniswapReversed: false
       })
     });
-    console.log('configs', configs);
+    console.log('configs', configs, configs.length);
 
     const cvpToken = await oracle.cvpToken();
     const reservoir = await oracle.reservoir();
     const anchorPeriod = await oracle.anchorPeriod();
-    console.log('cvpToken, reservoir, anchorPeriod', cvpToken, reservoir, anchorPeriod);
-    fs.writeFileSync('./tmp/latestOracleDeployArguments.js', `module.exports = ${JSON.stringify(
-      [cvpToken, reservoir, anchorPeriod, configs],
-      null,
-      2
-    )}`);
-    const newImpl = await PowerOracle.new(cvpToken, reservoir, anchorPeriod, configs);
+    const newImpl = await deployAndSaveArgs(PowerOracle, [cvpToken, reservoir, anchorPeriod, configs])
     console.log('newImpl', newImpl.address);
+
+    const { web3 } = PowerOracle;
+    const networkId = await web3.eth.net.getId();
+    if (networkId === 1) {
+      return;
+    }
+
+    await forkContractUpgrade(
+      ethers,
+      '0xb258302c3f209491d604165549079680708581cc',
+      '0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb',
+      '0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB',
+      newImpl.address
+    );
+
+    const symbols = ['LEND', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'COVER', 'KP3R', 'PICKLE'];
+
+    await increaseTime(ethers, 60 * 60);
+
+    await oracle.poke(symbols);
+
+    await increaseTime(ethers, 60 * 60);
+
+    await oracle.poke(symbols);
+
+    await increaseTime(ethers, 60 * 60);
+
+    await oracle.poke(symbols);
+
+    await pIteration.forEachSeries(symbols, async (s) => {
+      console.log(s, parseInt(await oracle.getPriceBySymbolHash(keccak256(s))) / 10 ** 6);
+    });
 
     console.log('Done');
   });
