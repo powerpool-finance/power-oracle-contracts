@@ -6,5 +6,6 @@ node_modules/
 contracts/UniswapTWAPProvider.sol
 contracts/Uniswap/UniswapConfig.sol
 contracts/Uniswap/UniswapLib.sol
+contracts/Uniswap/UniswapV2Library.sol
 contracts/utils/Ownable.sol
 contracts/utils/Pausable.sol
