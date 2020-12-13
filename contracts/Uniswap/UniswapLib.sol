@@ -15,7 +15,7 @@ library FixedPoint {
     // returns a uq112x112 which represents the ratio of the numerator to the denominator
     // equivalent to encode(numerator).div(denominator)
     function fraction(uint112 numerator, uint112 denominator) internal pure returns (uq112x112 memory) {
-        require(denominator > 0, "FixedPoint: DIV_BY_ZERO");
+        require(denominator > 0, "DIV_BY_ZERO");
         return uq112x112((uint224(numerator) << 112) / denominator);
     }
 

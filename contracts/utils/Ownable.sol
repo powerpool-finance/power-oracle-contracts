@@ -41,7 +41,7 @@ contract Ownable {
    * @dev Throws if called by any account other than the owner.
    */
   modifier onlyOwner() {
-    require(_owner == msg.sender, "Ownable: caller is not the owner");
+    require(_owner == msg.sender, "NOT_THE_OWNER");
     _;
   }
 
@@ -62,7 +62,7 @@ contract Ownable {
    * Can only be called by the current owner.
    */
   function transferOwnership(address newOwner) public virtual onlyOwner {
-    require(newOwner != address(0), "Ownable: new owner is the zero address");
+    require(newOwner != address(0), "NEW_OWNER_IS_NULL");
     emit OwnershipTransferred(_owner, newOwner);
     _owner = newOwner;
   }
@@ -71,7 +71,7 @@ contract Ownable {
    * @dev Transfers ownership of the contract to a new account (`newOwner`).
    */
   function _transferOwnership(address newOwner) internal {
-    require(newOwner != address(0), "Ownable: new owner is the zero address");
+    require(newOwner != address(0), "NEW_OWNER_IS_NULL");
     emit OwnershipTransferred(_owner, newOwner);
     _owner = newOwner;
   }
