@@ -696,7 +696,7 @@ describe('PowerOracle', function () {
 
     it('should deny withdrawing to 0 address', async function() {
       await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: alice }))
-        .to.be.revertedWith("ADDRESS");
+        .to.be.revertedWith('ADDRESS');
     });
   });
 
