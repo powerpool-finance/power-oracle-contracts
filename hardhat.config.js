@@ -45,7 +45,8 @@ const config = {
     // },
     hardhat: {
       gas: gasLimit,
-      blockGasLimit: gasLimit
+      blockGasLimit: gasLimit,
+      allowUnlimitedContractSize: true
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',

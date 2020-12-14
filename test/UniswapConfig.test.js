@@ -47,10 +47,10 @@ describe('UniswapConfig', () => {
     expect(cfg0).not.to.have.ordered.members(cfg1);
     expect(cfgU2).to.have.ordered.members(cfg2);
 
-    await expect(contract.getTokenConfig(3)).to.be.revertedWith('UniswapConfig::getTokenConfig: Token config not found');
-    await expect(contract.getTokenConfigBySymbol('COMP')).to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    await expect(contract.getTokenConfig(3)).to.be.revertedWith('TOKEN_NOT_FOUND');
+    await expect(contract.getTokenConfigBySymbol('COMP')).to.be.revertedWith('TOKEN_NOT_FOUND');
     await expect(contract.getTokenConfigByCToken(address(3))).to.be.reverted; // not a ctoken
-    await expect(contract.getTokenConfigByCToken(unlistedNorUnderlying.address)).to.be.revertedWith('UniswapConfig::getTokenConfigByUnderlying: Token cfg not found');
+    await expect(contract.getTokenConfigByCToken(unlistedNorUnderlying.address)).to.be.revertedWith('TOKEN_NOT_FOUND');
   });
 
   it('returns configs exactly as specified', async () => {
@@ -108,29 +108,29 @@ describe('UniswapConfig', () => {
     const cfg9 = await contract.getTokenConfig(9);
     const tx9 = await contract.contract.methods.getTokenConfig(9).send({ from: deployer });
     expect(cfg9.underlying.toLowerCase()).to.be.equal(address(10));
-    expect(tx9.gasUsed).to.be.equal(22619);
+    expect(tx9.gasUsed).to.be.equal(22663);
 
     const cfg8 = await contract.getTokenConfig(8);
     const tx8 = await contract.contract.methods.getTokenConfig(8).send({ from: deployer });
     expect(cfg8.underlying.toLowerCase()).to.be.equal(address(9));
-    expect(tx8.gasUsed).to.be.equal(22593);
+    expect(tx8.gasUsed).to.be.equal(22637);
 
     const cfgZ = await contract.getTokenConfigBySymbol('n');
     const txZ = await contract.contract.methods.getTokenConfigBySymbol('n').send({ from: deployer });
     expect(cfgZ.cToken.toLowerCase()).to.be.equal(address(13));
     expect(cfgZ.underlying.toLowerCase()).to.be.equal(address(14));
-    expect(txZ.gasUsed).to.be.equal(24649);
+    expect(txZ.gasUsed).to.be.equal(24638);
 
     const cfgCT14 = await contract.getTokenConfigByCToken(address(13));
     const txCT14 = await contract.contract.methods.getTokenConfigByCToken(address(13)).send({ from: deployer });
     expect(cfgCT14.cToken.toLowerCase()).to.be.equal(address(13));
     expect(cfgCT14.underlying.toLowerCase()).to.be.equal(address(14));
-    expect(txCT14.gasUsed).to.be.equal(24080);
+    expect(txCT14.gasUsed).to.be.equal(24124);
 
     const cfgU14 = await contract.getTokenConfigByUnderlying(address(14));
     const txU14 = await contract.contract.methods.getTokenConfigByUnderlying(address(14)).send({ from: deployer });
     expect(cfgU14.cToken.toLowerCase()).to.be.equal(address(13));
     expect(cfgU14.underlying.toLowerCase()).to.be.equal(address(14));
-    expect(txU14.gasUsed).to.be.equal(24081);
+    expect(txU14.gasUsed).to.be.equal(24058);
   });
 });

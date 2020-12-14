@@ -113,7 +113,7 @@ describe('PowerOracleStaking', function () {
       it('should deny creating a user when the contract is paused', async function() {
         await staking.pause({ from: owner });
         await expect(staking.createUser(alice, alicePoker, 0, { from: bob }))
-          .to.be.revertedWith('Pausable: paused');
+          .to.be.revertedWith('PAUSED');
       });
     });
 
@@ -215,7 +215,7 @@ describe('PowerOracleStaking', function () {
       it('should deny creating a user when the contract is paused', async function() {
         await staking.pause({ from: owner });
         await expect(staking.deposit(1, ether(10), { from: bob }))
-          .to.be.revertedWith('Pausable: paused');
+          .to.be.revertedWith('PAUSED');
       });
     })
 
@@ -323,7 +323,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner calling the method', async function() {
         await expect(staking.withdrawExtraCVP(sink, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
 
       it('should deny withdrawing to the 0 address', async function() {
@@ -340,7 +340,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner setting the value', async function() {
         await expect(staking.setMinimalSlashingDeposit(42, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       })
     });
 
@@ -352,7 +352,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner setting the value', async function() {
         await expect(staking.setPowerOracle(charlie, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       })
     })
 
@@ -370,7 +370,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner setting the value', async function() {
         await expect(staking.setSlashingPct(ether(40), ether(30), { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       })
     });
 
@@ -383,7 +383,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner pausing the contract', async function() {
         await expect(staking.pause({ from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
 
@@ -400,7 +400,7 @@ describe('PowerOracleStaking', function () {
 
       it('should deny non-owner unpausing the contract', async function() {
         await expect(staking.unpause({ from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
   });
