@@ -4,9 +4,10 @@ require('@nomiclabs/hardhat-truffle5');
 require('@nomiclabs/hardhat-ethers');
 
 const pIteration = require('p-iteration');
+const _ = require('lodash');
 
 task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
-  .setAction(async (_, {ethers}) => {
+  .setAction(async (__, {ethers}) => {
     const { keccak256, forkContractUpgrade, deployAndSaveArgs, increaseTime } = require('../test/helpers');
     const PowerOracle = artifacts.require('PowerOracle');
     PowerOracle.numberFormat = 'String';
@@ -17,7 +18,7 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
     console.log('numTokens', numTokens);
     const configs = [];
     for(let i = 0; i < numTokens; i++) {
-      configs[i] = await oracle.getTokenConfig(i);
+      configs[i] = _.pick(await oracle.getTokenConfig(i), ['cToken', 'underlying', 'symbolHash', 'baseUnit', 'priceSource', 'fixedPrice', 'uniswapMarket', 'isUniswapReversed']);
     }
     const addPairs = [
       {market: '0xce84867c3c02b05dc570d0135103d3fb9cc19433', token: '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', symbol: keccak256('SUSHI')},
