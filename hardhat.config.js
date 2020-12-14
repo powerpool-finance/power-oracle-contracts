@@ -6,7 +6,6 @@ require('hardhat-gas-reporter');
 require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
-require('./tasks/redeployOracleImplementation')
 require('./tasks/deployInstantUniswapPrice')
 
 
