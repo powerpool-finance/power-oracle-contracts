@@ -72,13 +72,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 calculatedReward
   );
 
+  /// @notice The event emitted when the slasher timestamps are updated
   event UpdateSlasher(uint256 indexed slasherId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
 
   /// @notice The event emitted when a reporter is missing pending tokens to update price for
   event NothingToReward(uint256 indexed userId, uint256 ethPrice);
-
-  /// @notice The event emitted when the stored price is updated
-  event PriceUpdated(string symbol, uint256 price);
 
   /// @notice The event emitted when the owner updates the cvpReportAPY value
   event SetCvpApy(uint256 cvpReportAPY, uint256 cvpSlasherUpdateAPY);
@@ -93,10 +91,17 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   event SetPowerOracleStaking(address powerOracleStaking);
 
   /// @notice The event emitted when the owner updates the gasExpensesPerAssetReport value
-  event SetGasExpenses(uint256 gasExpensesPerAssetReport, uint256 gasExpensesForSlasherStatusUpdate);
+  event SetGasExpenses(
+    uint256 gasExpensesPerAssetReport,
+    uint256 gasExpensesForSlasherStatusUpdate,
+    uint256 gasExpensesForSlasherPokeStatusUpdate
+  );
 
   /// @notice The event emitted when the owner updates the gasPriceLimit value
   event SetGasPriceLimit(uint256 gasPriceLimit);
+
+  /// @notice The event emitted when an admin withdraw his reward
+  event WithdrawRewards(uint256 indexed userId, address indexed to, uint256 amount);
 
   /// @notice CVP token address
   IERC20 public immutable cvpToken;
@@ -143,6 +148,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The total number of slashers update per year
   uint256 public totalSlasherUpdatesPerYear;
 
+  /// @notice The current estimated gas expenses for updating a slasher status by pokeFromSlasher
+  uint256 public gasExpensesForSlasherPokeStatusUpdate;
+
   constructor(
     address cvpToken_,
     address reservoir_,
@@ -162,6 +170,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 totalSlasherUpdatesPerYear_,
     uint256 gasExpensesPerAssetReport_,
     uint256 gasExpensesForSlasherStatusUpdate_,
+    uint256 gasExpensesForSlasherPokeStatusUpdate_,
     uint256 gasPriceLimit_,
     uint256 minReportInterval_,
     uint256 maxReportInterval_
@@ -174,6 +183,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     totalSlasherUpdatesPerYear = totalSlasherUpdatesPerYear_;
     gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
     gasExpensesForSlasherStatusUpdate = gasExpensesForSlasherStatusUpdate_;
+    gasExpensesForSlasherPokeStatusUpdate = gasExpensesForSlasherPokeStatusUpdate_;
     gasPriceLimit = gasPriceLimit_;
     minReportInterval = minReportInterval_;
     maxReportInterval = maxReportInterval_;
@@ -263,10 +273,16 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function _rewardSlasherUpdate(
     uint256 userId_,
     uint256 ethPrice_,
-    uint256 cvpPrice_
+    uint256 cvpPrice_,
+    bool byPokeFunc_
   ) internal {
     uint256 userDeposit = powerOracleStaking.getDepositOf(userId_);
-    uint256 amount = calculateSlasherUpdateReward(userDeposit, ethPrice_, cvpPrice_);
+    uint256 amount;
+    if (byPokeFunc_) {
+      amount = calculateSlasherUpdateReward(userDeposit, ethPrice_, cvpPrice_, gasExpensesForSlasherPokeStatusUpdate);
+    } else {
+      amount = calculateSlasherUpdateReward(userDeposit, ethPrice_, cvpPrice_, gasExpensesForSlasherStatusUpdate);
+    }
 
     if (amount > 0) {
       rewards[userId_] = rewards[userId_].add(amount);
@@ -279,15 +295,21 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function _updateSlasherAndReward(
     uint256 _slasherId,
     uint256 _ethPrice,
-    uint256 _cvpPrice
+    uint256 _cvpPrice,
+    bool byPokeFunc_
   ) internal {
     _updateSlasherTimestamp(_slasherId, true);
-    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice);
+    _rewardSlasherUpdate(_slasherId, _ethPrice, _cvpPrice, byPokeFunc_);
   }
 
   function _updateSlasherTimestamp(uint256 _slasherId, bool _rewardPaid) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
     uint256 delta = block.timestamp.sub(prevSlasherUpdate);
+
+    uint256 lastDepositChange = powerOracleStaking.getLastDepositChange(_slasherId);
+    uint256 depositChangeDelta = block.timestamp.sub(lastDepositChange);
+    require(depositChangeDelta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta");
+
     if (_rewardPaid) {
       require(delta >= maxReportInterval, "BELLOW_REPORT_INTERVAL");
     } else {
@@ -352,7 +374,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       _rewardUser(slasherId_, overdueCount, ethPrice, cvpPrice);
       _updateSlasherTimestamp(slasherId_, false);
     } else {
-      _updateSlasherAndReward(slasherId_, ethPrice, cvpPrice);
+      _updateSlasherAndReward(slasherId_, ethPrice, cvpPrice, true);
     }
   }
 
@@ -360,7 +382,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
 
     uint256 ethPrice = _fetchEthPrice();
-    _updateSlasherAndReward(slasherId_, ethPrice, _fetchCvpPrice(ethPrice));
+    _updateSlasherAndReward(slasherId_, ethPrice, _fetchCvpPrice(ethPrice), false);
   }
 
   /**
@@ -393,6 +415,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     rewards[userId_] = 0;
 
     cvpToken.transferFrom(reservoir, to_, rewardAmount);
+
+    emit WithdrawRewards(userId_, to_, rewardAmount);
   }
 
   /*** Owner Interface ***/
@@ -428,14 +452,19 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param gasExpensesPerAssetReport_ The gas amount for reporting a single asset
    * @param gasExpensesForSlasherStatusUpdate_ The gas amount for updating slasher status
    */
-  function setGasExpenses(uint256 gasExpensesPerAssetReport_, uint256 gasExpensesForSlasherStatusUpdate_)
-    external
-    override
-    onlyOwner
-  {
+  function setGasExpenses(
+    uint256 gasExpensesPerAssetReport_,
+    uint256 gasExpensesForSlasherStatusUpdate_,
+    uint256 gasExpensesForSlasherPokeStatusUpdate_
+  ) external override onlyOwner {
     gasExpensesPerAssetReport = gasExpensesPerAssetReport_;
     gasExpensesForSlasherStatusUpdate = gasExpensesForSlasherStatusUpdate_;
-    emit SetGasExpenses(gasExpensesPerAssetReport_, gasExpensesForSlasherStatusUpdate_);
+    gasExpensesForSlasherPokeStatusUpdate = gasExpensesForSlasherPokeStatusUpdate_;
+    emit SetGasExpenses(
+      gasExpensesPerAssetReport_,
+      gasExpensesForSlasherStatusUpdate_,
+      gasExpensesForSlasherPokeStatusUpdate_
+    );
   }
 
   /**
@@ -524,12 +553,10 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function calculateSlasherUpdateReward(
     uint256 deposit_,
     uint256 ethPrice_,
-    uint256 cvpPrice_
+    uint256 cvpPrice_,
+    uint256 gasExpenses_
   ) public view returns (uint256) {
-    return
-      calculateSlasherFixedReward(deposit_).add(
-        calculateGasCompensation(ethPrice_, cvpPrice_, gasExpensesForSlasherStatusUpdate)
-      );
+    return calculateSlasherFixedReward(deposit_).add(calculateGasCompensation(ethPrice_, cvpPrice_, gasExpenses_));
   }
 
   function calculateSlasherFixedReward(uint256 deposit_) public view returns (uint256) {

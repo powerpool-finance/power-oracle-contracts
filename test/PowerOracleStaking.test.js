@@ -1,5 +1,5 @@
 const { constants, expectEvent } = require('@openzeppelin/test-helpers');
-const { ether, deployProxied } = require('./helpers');
+const { ether, deployProxied, getResTimestamp } = require('./helpers');
 const { getTokenConfigs  } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
@@ -108,12 +108,21 @@ describe('PowerOracleStaking', function () {
         expectEvent(res, 'CreateUser', { userId: '2' });
         res = await staking.createUser(alice, alicePoker, 0, { from: bob });
         expectEvent(res, 'CreateUser', { userId: '3' });
+
+        expect('0').to.be.eq(await staking.getLastDepositChange('1'));
       });
 
       it('should deny creating a user when the contract is paused', async function() {
         await staking.pause({ from: owner });
         await expect(staking.createUser(alice, alicePoker, 0, { from: bob }))
           .to.be.revertedWith('PAUSED');
+      });
+
+      it('should allow creating a user with deposit', async function() {
+        await cvpToken.transfer(bob, ether(50), { from: deployer });
+        await cvpToken.approve(staking.address, ether(50), { from: bob });
+        let res = await staking.createUser(alice, alicePoker, ether(50), { from: bob });
+        expect(await getResTimestamp(res)).to.be.eq(await staking.getLastDepositChange('1'));
       });
     });
 
@@ -158,6 +167,7 @@ describe('PowerOracleStaking', function () {
           amount: ether(10),
           depositAfter: ether(10)
         })
+        expect(await getResTimestamp(res)).to.be.eq(await staking.getLastDepositChange('1'));
 
         expect(await staking.totalDeposit()).to.be.equal(ether(10));
 
@@ -233,6 +243,7 @@ describe('PowerOracleStaking', function () {
         expect(await staking.totalDeposit()).to.be.equal(ether('100'));
 
         const res = await staking.withdraw(USER_ID, sink, ether(100), { from: alice });
+        expect(await getResTimestamp(res)).to.be.eq(await staking.getLastDepositChange(USER_ID));
 
         expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('100'));
         expect(await staking.totalDeposit()).to.be.equal(ether('0'));
@@ -250,6 +261,7 @@ describe('PowerOracleStaking', function () {
         expect(await staking.totalDeposit()).to.be.equal(ether('100'));
 
         const res = await staking.withdraw(USER_ID, sink, ether(30), { from: alice });
+        expect(await getResTimestamp(res)).to.be.eq(await staking.getLastDepositChange(USER_ID));
 
         expect(await cvpToken.balanceOf(sink)).to.be.equal(ether('30'));
         expect(await staking.totalDeposit()).to.be.equal(ether('70'));

@@ -7,7 +7,9 @@ require('hardhat-gas-reporter');
 require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
+require('./tasks/deployInstantUniswapPrice')
 require('./tasks/redeployOracleImplementation')
+
 
 const fs = require('fs');
 const homeDir = require('os').homedir();

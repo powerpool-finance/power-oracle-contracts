@@ -26,7 +26,8 @@ const CVP_SLASHER_UPDATE_APY = ether(10);
 const TOTAL_REPORTS_PER_YEAR = '90000';
 const TOTAL_SLASHER_UPDATES_PER_YEAR = '50000';
 const GAS_EXPENSES_PER_ASSET_REPORT = '110000';
-const GAS_EXPENSES_FOR_SLASHER_UPDATE = '117500';
+const GAS_EXPENSES_FOR_SLASHER_UPDATE = '84000';
+const GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE = '117500';
 const GAS_PRICE_LIMIT = gwei(1000);
 const ANCHOR_PERIOD = '45';
 const MIN_REPORT_INTERVAL = '30';
@@ -79,19 +80,19 @@ describe('PowerOracle', function () {
   let oracle;
   let cvpToken;
 
-  let deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink;
+  let deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink;
 
   before(async function() {
-    [deployer, owner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
+    [deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
   });
 
   beforeEach(async function() {
-    cvpToken = await MockCVP.new(ether(100000));
+    cvpToken = await MockCVP.new(ether(1000000));
     staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
       StubOracle,
       [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-      [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+      [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
     );
 
@@ -111,13 +112,14 @@ describe('PowerOracle', function () {
       expect(await oracle.totalSlasherUpdatesPerYear()).to.be.equal(TOTAL_SLASHER_UPDATES_PER_YEAR);
       expect(await oracle.gasExpensesPerAssetReport()).to.be.equal(GAS_EXPENSES_PER_ASSET_REPORT);
       expect(await oracle.gasExpensesForSlasherStatusUpdate()).to.be.equal(GAS_EXPENSES_FOR_SLASHER_UPDATE);
+      expect(await oracle.gasExpensesForSlasherPokeStatusUpdate()).to.be.equal(GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE);
       expect(await oracle.gasPriceLimit()).to.be.equal(GAS_PRICE_LIMIT);
       expect(await oracle.minReportInterval()).to.be.equal(MIN_REPORT_INTERVAL);
       expect(await oracle.maxReportInterval()).to.be.equal(MAX_REPORT_INTERVAL);
     });
 
     it('should deny initializing again', async function() {
-      await expect(oracle.initialize(owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
+      await expect(oracle.initialize(owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })
@@ -163,7 +165,7 @@ describe('PowerOracle', function () {
         oracle = await deployProxied(
           MockOracle,
           [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-          [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+          [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
           { proxyAdminOwner: owner }
         );
         await staking.setPowerOracle(oracle.address, { from: deployer });
@@ -350,13 +352,16 @@ describe('PowerOracle', function () {
       oracle = await deployProxied(
         MockOracle,
         [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
-        [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
+        [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
         { proxyAdminOwner: owner }
       );
 
-      await staking.mockSetUser(1, alice, validReporterPoker, ether(300));
-      await staking.mockSetReporter(1, ether(300));
-      await staking.mockSetUser(2, alice, validSlasherPoker, ether(100));
+      await cvpToken.transfer(alice, ether(400), { from: deployer });
+      await cvpToken.approve(staking.address, ether(400), { from: alice });
+      await staking.createUser(alice, validReporterPoker, ether(300), { from: alice });
+      await staking.createUser(alice, validSlasherPoker, ether(100), { from: alice });
+
+      await time.increase(MAX_REPORT_INTERVAL_INT + 1);
     });
 
     it('should allow a valid slasher calling a method when all token prices are outdated', async function() {
@@ -547,6 +552,51 @@ describe('PowerOracle', function () {
       })
     });
 
+    it('sshould deny slasherUpdate right after deposit or withdraw', async function() {
+      // 1st poke
+      await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
+      await time.increase(5);
+
+      await cvpToken.transfer(dan, ether(1000), { from: deployer });
+      await cvpToken.approve(staking.address, ether(30), { from: dan });
+
+      await staking.createUser(dan, danSlasher, ether(30), { from: dan });
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MIN_REPORT_INTERVAL_INT);
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MAX_REPORT_INTERVAL - MIN_REPORT_INTERVAL_INT);
+
+      let res = await oracle.slasherUpdate(3, { from: danSlasher });
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '3'
+      });
+
+      await time.increase(MAX_REPORT_INTERVAL + 1);
+
+      await staking.withdraw('3', dan, ether(1), { from: dan });
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MIN_REPORT_INTERVAL_INT);
+
+      await expect(oracle.slasherUpdate(3, { from: danSlasher }))
+        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta');
+
+      await time.increase(MAX_REPORT_INTERVAL - MIN_REPORT_INTERVAL_INT);
+
+      res = await oracle.slasherUpdate(3, { from: danSlasher });
+      expectEvent(res, 'RewardUserSlasherUpdate', {
+        slasherId: '3'
+      });
+    });
+
     it('should revert slasherUpdate when delta bellow maxReportInterval', async function() {
       // 1st poke
       let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
@@ -572,7 +622,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
     });
 
-    it('should not call PowerOracleStaking.slash() method if there are no prices outdated', async function() {
+    it('should receive correct reward by slasherUpdate method', async function() {
       await oracle.mockSetAnchorPrice('ETH', mwei('320'));
       await oracle.mockSetAnchorPrice('CVP', mwei('5'));
       // 1st poke
@@ -588,7 +638,7 @@ describe('PowerOracle', function () {
 
       expectEvent(res, 'RewardUserSlasherUpdate', {
         slasherId: '2',
-        calculatedReward: ether(0.2634)
+        calculatedReward: ether(0.18836)
       });
 
       expectEvent.notEmitted(res, 'RewardUserReport');
@@ -729,13 +779,14 @@ describe('PowerOracle', function () {
 
     describe('setGasExpenses', () => {
       it('should allow the owner setting a new value', async function() {
-        await oracle.setGasExpenses(42, 22, { from: owner });
+        await oracle.setGasExpenses(42, 22, 32, { from: owner });
         expect(await oracle.gasExpensesPerAssetReport()).to.be.equal('42');
         expect(await oracle.gasExpensesForSlasherStatusUpdate()).to.be.equal('22');
+        expect(await oracle.gasExpensesForSlasherPokeStatusUpdate()).to.be.equal('32');
       });
 
       it('should deny non-reporter calling the method', async function() {
-        await expect(oracle.setGasExpenses(42, 22, { from: alice }))
+        await expect(oracle.setGasExpenses(42, 22, 32, { from: alice }))
           .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
@@ -851,7 +902,7 @@ describe('PowerOracle', function () {
         await oracle.setCvpAPY(ether(20), ether(10), { from: owner });
         await oracle.setTotalPerYear(90000, 50000, { from: owner });
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 117500, { from: owner });
+        await oracle.setGasExpenses(110000, 84000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {
@@ -893,7 +944,7 @@ describe('PowerOracle', function () {
     describe('calculateGasCompensation', () => {
       beforeEach(async function() {
         await oracle.setGasPriceLimit(gwei(1000), { from: owner });
-        await oracle.setGasExpenses(110000, 117500, { from: owner });
+        await oracle.setGasExpenses(110000, 84000, 117500, { from: owner });
       });
 
       it('should correctly calculate a reward', async () => {

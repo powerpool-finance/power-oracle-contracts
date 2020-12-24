@@ -59,4 +59,6 @@ interface IPowerOracleStaking {
   function authorizeSlasher(uint256 userId_, address reporterKey_) external view;
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view;
+
+  function getLastDepositChange(uint256 userId_) external view returns (uint256);
 }
