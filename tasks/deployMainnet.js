@@ -1,9 +1,9 @@
-/* global usePlugin, task */
+/* global task */
 
 const pIteration = require('p-iteration');
 const _ = require('lodash');
 
-usePlugin('@nomiclabs/buidler-truffle5');
+require('@nomiclabs/hardhat-truffle5');
 
 task('deploy-mainnet', 'Deploys mainnet contracts')
   .setAction(async () => {

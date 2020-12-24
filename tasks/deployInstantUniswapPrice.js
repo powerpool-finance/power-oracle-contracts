@@ -1,6 +1,6 @@
-/* global usePlugin, task */
+/* global task */
 
-usePlugin('@nomiclabs/buidler-truffle5');
+require('@nomiclabs/hardhat-truffle5');
 
 task('deploy-instant-uniswap-price', 'Deploy instant uniswap price')
   .setAction(async () => {
