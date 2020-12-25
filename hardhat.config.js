@@ -1,4 +1,5 @@
 require('@nomiclabs/hardhat-truffle5');
+require('@nomiclabs/hardhat-etherscan');
 require('solidity-coverage');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
@@ -7,6 +8,7 @@ require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
 require('./tasks/deployInstantUniswapPrice')
+require('./tasks/redeployOracleImplementation')
 
 
 const fs = require('fs');
@@ -45,18 +47,20 @@ const config = {
     // },
     hardhat: {
       gas: gasLimit,
-      blockGasLimit: gasLimit
+      blockGasLimit: gasLimit,
+      allowUnlimitedContractSize: true
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
       gasPrice: 45 * 10 ** 9,
+      gasMultiplier: 1.5,
       accounts: getAccounts('mainnet'),
       gas: gasLimit,
       blockGasLimit: gasLimit
     },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
-      // accounts: getAccounts('mainnet'),
+      accounts: getAccounts('mainnet'),
       gasPrice: 45 * 10 ** 9,
       gasMultiplier: 1.5,
       timeout: 2000000,
@@ -93,6 +97,9 @@ const config = {
     outDir: 'typechain',
     target: 'ethers-v5',
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_KEY
+  }
 };
 
 module.exports = config;

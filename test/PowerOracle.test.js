@@ -141,23 +141,23 @@ describe('PowerOracle', function () {
 
     it('should deny calling with an empty array', async function() {
       await expect(oracle.pokeFromReporter(1, [], { from: validReporterPoker }))
-        .to.be.revertedWith('PowerOracle::pokeFromReporter: Missing token symbols');
+        .to.be.revertedWith('MISSING_SYMBOLS');
     });
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
-        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+        .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
-        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+        .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
     it('should deny poking when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker }))
-        .to.be.revertedWith('Pausable: paused');
+        .to.be.revertedWith('PAUSED');
     });
 
     describe('rewards', () => {
@@ -419,7 +419,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(slasherUpdateTimestamp);
 
       await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow diff');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL_DIFF');
 
       await time.increase(MAX_REPORT_INTERVAL_INT - MIN_REPORT_INTERVAL_INT);
 
@@ -453,15 +453,15 @@ describe('PowerOracle', function () {
       });
 
       await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(thirdTimestamp);
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
 
@@ -533,7 +533,7 @@ describe('PowerOracle', function () {
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(secondTimestamp);
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       const thirdTimestamp = await getResTimestamp(res);
 
@@ -609,10 +609,10 @@ describe('PowerOracle', function () {
 
       // 2nd poke
       await expect(oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], { from: validSlasherPoker, gasPrice: gwei(35) }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::_updateSlasherAndReward: bellow maxReportInterval');
+        .to.be.revertedWith('BELLOW_REPORT_INTERVAL');
 
       await time.increase(MAX_REPORT_INTERVAL_INT + 5);
 
@@ -656,24 +656,24 @@ describe('PowerOracle', function () {
 
     it('should deny calling with an empty array', async function() {
       await expect(oracle.pokeFromSlasher(2, [], { from: validSlasherPoker }))
-        .to.be.revertedWith('PowerOracle::pokeFromSlasher: Missing token symbols');
+        .to.be.revertedWith('MISSING_SYMBOLS');
     });
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromSlasher(2, ['FOO'], { from: validSlasherPoker }))
-        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+        .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
     it('should deny poking when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(2, ['REP'], { from: validSlasherPoker }))
-        .to.be.revertedWith('Pausable: paused');
+        .to.be.revertedWith('PAUSED');
     });
 
     it('should deny slasher updating when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.slasherUpdate(2, { from: validSlasherPoker }))
-        .to.be.revertedWith('Pausable: paused');
+        .to.be.revertedWith('PAUSED');
     });
   });
 
@@ -707,18 +707,18 @@ describe('PowerOracle', function () {
 
     it('should deny poking with an empty array', async function() {
       await expect(oracle.poke([], { from: bob }))
-        .to.be.revertedWith('PowerOracle::poke: Missing token symbols');
+        .to.be.revertedWith('MISSING_SYMBOLS');
     });
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.poke(['FOO'], { from: bob }))
-        .to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+        .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
     it('should deny poking when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.poke(['REP'], { from: bob }))
-        .to.be.revertedWith('Pausable: paused');
+        .to.be.revertedWith('PAUSED');
     });
   });
 
@@ -746,7 +746,7 @@ describe('PowerOracle', function () {
 
     it('should deny withdrawing to 0 address', async function() {
       await expect(oracle.withdrawRewards(USER_ID, constants.ZERO_ADDRESS, { from: alice }))
-        .to.be.revertedWith("PowerOracle::withdrawRewards: Can't withdraw to 0 address");
+        .to.be.revertedWith('ADDRESS');
     });
   });
 
@@ -760,7 +760,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setCvpAPY(42, 22, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -773,7 +773,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setTotalPerYear(42, 22, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -787,7 +787,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setGasExpenses(42, 22, 32, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -799,7 +799,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setGasPriceLimit(42, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -811,7 +811,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setPowerOracleStaking(sink, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -824,7 +824,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-reporter calling the method', async function() {
         await expect(oracle.setReportIntervals(222, 333, { from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     });
 
@@ -837,7 +837,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-owner pausing the contract', async function() {
         await expect(oracle.pause({ from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
 
@@ -854,7 +854,7 @@ describe('PowerOracle', function () {
 
       it('should deny non-owner unpausing the contract', async function() {
         await expect(oracle.unpause({ from: alice }))
-          .to.be.revertedWith('Ownable: caller is not the owner');
+          .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
   });
@@ -915,11 +915,11 @@ describe('PowerOracle', function () {
       })
 
       it('should should revert when ETH price is 0', async () => {
-        await expect(oracle.calculateReportReward(1, 1, 0, 3)).to.be.revertedWith('PowerOracle::calculateGasCompensation: ETH price is 0');
+        await expect(oracle.calculateReportReward(1, 1, 0, 3)).to.be.revertedWith('ETH_PRICE_IS_NULL');
       })
 
       it('should should revert when CVP price is 0', async () => {
-        await expect(oracle.calculateReportReward(1, 1, 1, 0)).to.be.revertedWith('PowerOracle::calculateGasCompensation: CVP price is 0');
+        await expect(oracle.calculateReportReward(1, 1, 1, 0)).to.be.revertedWith('CVP_PRICE_IS_NULL');
       })
     });
 
@@ -959,11 +959,11 @@ describe('PowerOracle', function () {
       })
 
       it('should should revert when ETH price is 0', async () => {
-        await expect(oracle.calculateGasCompensation(0, 1, 1)).to.be.revertedWith('PowerOracle::calculateGasCompensation: ETH price is 0');
+        await expect(oracle.calculateGasCompensation(0, 1, 1)).to.be.revertedWith('ETH_PRICE_IS_NULL');
       })
 
       it('should should revert when CVP price is 0', async () => {
-        await expect(oracle.calculateGasCompensation(1, 0, 1)).to.be.revertedWith('PowerOracle::calculateGasCompensation: CVP price is 0');
+        await expect(oracle.calculateGasCompensation(1, 0, 1)).to.be.revertedWith('CVP_PRICE_IS_NULL');
       })
     });
   })

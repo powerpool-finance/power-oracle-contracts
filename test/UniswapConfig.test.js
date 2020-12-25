@@ -47,10 +47,10 @@ describe('UniswapConfig', () => {
     expect(cfg0).not.to.have.ordered.members(cfg1);
     expect(cfgU2).to.have.ordered.members(cfg2);
 
-    await expect(contract.getTokenConfig(3)).to.be.revertedWith('UniswapConfig::getTokenConfig: Token config not found');
-    await expect(contract.getTokenConfigBySymbol('COMP')).to.be.revertedWith('UniswapConfig::getTokenConfigBySymbolHash: Token cfg not found');
+    await expect(contract.getTokenConfig(3)).to.be.revertedWith('TOKEN_NOT_FOUND');
+    await expect(contract.getTokenConfigBySymbol('COMP')).to.be.revertedWith('TOKEN_NOT_FOUND');
     await expect(contract.getTokenConfigByCToken(address(3))).to.be.reverted; // not a ctoken
-    await expect(contract.getTokenConfigByCToken(unlistedNorUnderlying.address)).to.be.revertedWith('UniswapConfig::getTokenConfigByUnderlying: Token cfg not found');
+    await expect(contract.getTokenConfigByCToken(unlistedNorUnderlying.address)).to.be.revertedWith('TOKEN_NOT_FOUND');
   });
 
   it('returns configs exactly as specified', async () => {

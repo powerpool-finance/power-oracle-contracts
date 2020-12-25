@@ -213,7 +213,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   function _fetchAndSavePrice(string memory symbol_, uint256 ethPrice_) internal returns (ReportInterval) {
     TokenConfig memory config = getTokenConfigBySymbol(symbol_);
-    require(config.priceSource == PriceSource.REPORTER, "only reporter prices get posted");
+    require(config.priceSource == PriceSource.REPORTER, "NOT_REPORTER");
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
 
     ReportInterval intervalStatus = getIntervalStatus(symbolHash);
@@ -242,10 +242,10 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
     if (config_.priceSource == PriceSource.FIXED_ETH) {
       uint256 usdPerEth = prices[ethHash].value;
-      require(usdPerEth > 0, "ETH price not set, cannot convert to dollars");
+      require(usdPerEth > 0, "ETH_PRICE_NOT_SET");
       return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
     }
-    revert("UniswapTWAPProvider::priceInternal: Unsupported case");
+    revert("UNSUPPORTED_PRICE_CASE");
   }
 
   function _rewardUser(
@@ -311,9 +311,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     require(depositChangeDelta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow depositChangeDelta");
 
     if (_rewardPaid) {
-      require(delta >= maxReportInterval, "PowerOracle::_updateSlasherAndReward: bellow maxReportInterval");
+      require(delta >= maxReportInterval, "BELLOW_REPORT_INTERVAL");
     } else {
-      require(delta >= maxReportInterval.sub(minReportInterval), "PowerOracle::_updateSlasherAndReward: bellow diff");
+      require(delta >= maxReportInterval.sub(minReportInterval), "BELLOW_REPORT_INTERVAL_DIFF");
     }
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, lastSlasherUpdates[_slasherId]);
@@ -328,7 +328,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    */
   function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external override whenNotPaused {
     uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::pokeFromReporter: Missing token symbols");
+    require(len > 0, "MISSING_SYMBOLS");
 
     powerOracleStaking.authorizeReporter(reporterId_, msg.sender);
 
@@ -353,7 +353,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    */
   function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external override whenNotPaused {
     uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::pokeFromSlasher: Missing token symbols");
+    require(len > 0, "MISSING_SYMBOLS");
 
     powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
 
@@ -391,7 +391,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    */
   function poke(string[] memory symbols_) external override whenNotPaused {
     uint256 len = symbols_.length;
-    require(len > 0, "PowerOracle::poke: Missing token symbols");
+    require(len > 0, "MISSING_SYMBOLS");
 
     uint256 ethPrice = _fetchEthPrice();
 
@@ -409,9 +409,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    */
   function withdrawRewards(uint256 userId_, address to_) external override {
     powerOracleStaking.requireValidAdminKey(userId_, msg.sender);
-    require(to_ != address(0), "PowerOracle::withdrawRewards: Can't withdraw to 0 address");
+    require(to_ != address(0), "0_ADDRESS");
     uint256 rewardAmount = rewards[userId_];
-    require(rewardAmount > 0, "PowerOracle::withdrawRewards: Nothing to withdraw");
+    require(rewardAmount > 0, "NOTHING_TO_WITHDRAW");
     rewards[userId_] = 0;
 
     cvpToken.transferFrom(reservoir, to_, rewardAmount);
@@ -531,8 +531,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   function calculateReporterFixedReward(uint256 deposit_) public view returns (uint256) {
-    require(cvpReportAPY > 0, "PowerOracle: cvpReportAPY is 0");
-    require(totalReportsPerYear > 0, "PowerOracle: totalReportsPerYear is 0");
+    require(cvpReportAPY > 0, "APY_IS_NULL");
+    require(totalReportsPerYear > 0, "TOTAL_REPORTS_PER_YEAR_IS_NULL");
     // return cvpReportAPY * deposit_ / totalReportsPerYear / HUNDRED_PCT;
     return cvpReportAPY.mul(deposit_) / totalReportsPerYear / HUNDRED_PCT;
   }
@@ -542,9 +542,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 cvpPrice_,
     uint256 gasExpenses_
   ) public view returns (uint256) {
-    require(ethPrice_ > 0, "PowerOracle::calculateGasCompensation: ETH price is 0");
-    require(cvpPrice_ > 0, "PowerOracle::calculateGasCompensation: CVP price is 0");
-    require(gasExpenses_ > 0, "PowerOracle::calculateGasCompensation: Gas expenses is 0");
+    require(ethPrice_ > 0, "ETH_PRICE_IS_NULL");
+    require(cvpPrice_ > 0, "CVP_PRICE_IS_NULL");
+    require(gasExpenses_ > 0, "GAS_EXPENSES_IS_NULL");
 
     // return _min(tx.gasprice, gasPriceLimit) * gasExpensesPerAssetReport * ethPrice_ / cvpPrice_;
     return _min(tx.gasprice, gasPriceLimit).mul(gasExpenses_).mul(ethPrice_) / cvpPrice_;
@@ -560,8 +560,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   function calculateSlasherFixedReward(uint256 deposit_) public view returns (uint256) {
-    require(cvpSlasherUpdateAPY > 0, "PowerOracle: cvpSlasherUpdateAPY is 0");
-    require(totalSlasherUpdatesPerYear > 0, "PowerOracle: totalSlasherUpdatesPerYear is 0");
+    require(cvpSlasherUpdateAPY > 0, "APY_IS_NULL");
+    require(totalSlasherUpdatesPerYear > 0, "UPDATES_PER_YEAR_IS_NULL");
     return cvpSlasherUpdateAPY.mul(deposit_) / totalSlasherUpdatesPerYear / HUNDRED_PCT;
   }
 

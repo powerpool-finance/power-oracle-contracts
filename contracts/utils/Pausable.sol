@@ -42,7 +42,7 @@ contract Pausable {
    * - The contract must not be paused.
    */
   modifier whenNotPaused() {
-    require(!_paused, "Pausable: paused");
+    require(!_paused, "PAUSED");
     _;
   }
 
@@ -54,7 +54,7 @@ contract Pausable {
    * - The contract must be paused.
    */
   modifier whenPaused() {
-    require(_paused, "Pausable: not paused");
+    require(_paused, "NOT_PAUSED");
     _;
   }
 

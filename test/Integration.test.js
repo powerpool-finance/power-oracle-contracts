@@ -167,7 +167,7 @@ describe('IntegrationTest', function () {
     // Withdrawing rewards
     await oracle.withdrawRewards(aliceId, alice, { from: alice });
     await expect(oracle.withdrawRewards(aliceId, alice, { from: alice }))
-      .to.be.revertedWith('PowerOracle::withdrawRewards: Nothing to withdraw');
+      .to.be.revertedWith('NOTHING_TO_WITHDRAW');
 
     // Withdraw stake
     await expect(staking.withdraw(aliceId, alice, ether(61), { from: alice }))

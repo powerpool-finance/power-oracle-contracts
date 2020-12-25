@@ -50,10 +50,10 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
 
     for (uint i = 0; i < configs.length; i++) {
       TokenConfig memory config = configs[i];
-      require(config.baseUnit > 0, "baseUnit must be greater than zero");
+      require(config.baseUnit > 0, "BASE_UNIT_IS_NULL");
       address uniswapMarket = config.uniswapMarket;
       if (config.priceSource == PriceSource.REPORTER) {
-        require(uniswapMarket != address(0), "reported prices must have an anchor");
+        require(uniswapMarket != address(0), "MARKET_IS_NULL");
         bytes32 symbolHash = config.symbolHash;
         uint cumulativePrice = currentCumulativePrice(config);
         oldObservations[symbolHash].timestamp = block.timestamp;
@@ -62,7 +62,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
         newObservations[symbolHash].acc = cumulativePrice;
         emit UniswapWindowUpdated(symbolHash, block.timestamp, block.timestamp, cumulativePrice, cumulativePrice);
       } else {
-        require(uniswapMarket == address(0), "only reported prices utilize an anchor");
+        require(uniswapMarket == address(0), "MARKET_IS_NOT_NULL");
       }
     }
   }
@@ -99,7 +99,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
     (uint nowCumulativePrice, uint oldCumulativePrice, uint oldTimestamp) = pokeWindowValues(config);
 
     // This should be impossible, but better safe than sorry
-    require(block.timestamp > oldTimestamp, "now must come after before");
+    require(block.timestamp > oldTimestamp, "TOO_EARLY");
     uint timeElapsed = block.timestamp - oldTimestamp;
 
     // Calculate uniswap time-weighted average price
@@ -150,7 +150,7 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
   function mul(uint a, uint b) internal pure returns (uint) {
     if (a == 0) return 0;
     uint c = a * b;
-    require(c / a == b, "multiplication overflow");
+    require(c / a == b, "MUL_OVERFLOW");
     return c;
   }
 }
