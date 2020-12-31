@@ -8,10 +8,11 @@ Power Oracle is a decentralized cross-chain price oracle working on Ethereum Mai
 
 ## Contracts on Ethereum Main Network
 ### Active
-- `PowerOracle`(ProxyAdmin - [0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb](https://etherscan.io/address/0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb#code), Proxy - [0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB](https://etherscan.io/address/0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB#code), Implementation - [0x4b6E556841a88B0682c0bc9AbB6bdAF4572184b4](https://etherscan.io/address/0x4b6E556841a88B0682c0bc9AbB6bdAF4572184b4)).
+- `PowerOracle`(ProxyAdmin - [0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb](https://etherscan.io/address/0x7696f9208f9e195ba31e6f4B2D07B6462C8C42bb#code), Proxy - [0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB](https://etherscan.io/address/0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB#code), Implementation - [0x3359Bb31CD8F80a98a13856d3C89b71e7b51a0F0](https://etherscan.io/address/0x3359Bb31CD8F80a98a13856d3C89b71e7b51a0F0)).
 
 ### Deprecated
-- `PowerOracle`(Implementation - [0xA394922A1A45786583e5383cf4485a6F325d8807](https://etherscan.io/address/0xA394922A1A45786583e5383cf4485a6F325d8807)). Previous implementation.
+- `PowerOracle`(Implementation - [0xA394922A1A45786583e5383cf4485a6F325d8807](https://etherscan.io/address/0xA394922A1A45786583e5383cf4485a6F325d8807)). Previous implementation;
+- `PowerOracle`(Implementation - [0x4b6E556841a88B0682c0bc9AbB6bdAF4572184b4](https://etherscan.io/address/0x4b6E556841a88B0682c0bc9AbB6bdAF4572184b4)). Previous implementation;
 
 ## Contracts on Kovan Test Network
 
