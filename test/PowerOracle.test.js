@@ -9,6 +9,7 @@ const MockCVP = artifacts.require('MockCVP');
 const MockStaking = artifacts.require('MockStaking');
 const StubOracle = artifacts.require('StubOracle');
 const MockOracle = artifacts.require('MockOracle');
+const MockProxyCall = artifacts.require('MockProxyCall');
 
 chai.use(solidity);
 const { expect } = chai;
@@ -79,11 +80,13 @@ describe('PowerOracle', function () {
   let staking;
   let oracle;
   let cvpToken;
+  let proxyCall;
 
   let deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink;
 
   before(async function() {
     [deployer, owner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink] = await web3.eth.getAccounts();
+    proxyCall = await MockProxyCall.new();
   });
 
   beforeEach(async function() {
@@ -158,6 +161,11 @@ describe('PowerOracle', function () {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(1, ['REP'], { from: validReporterPoker }))
         .to.be.revertedWith('PAUSED');
+    });
+
+    it('should deny poking from a contract', async function() {
+      const data = oracle.contract.methods.pokeFromReporter(1, ['REP']).encodeABI();
+      await expect(proxyCall.call(oracle.address, data)).to.be.revertedWith('CONTRACT_CALLS_DENIED');
     });
 
     describe('rewards', () => {
@@ -552,7 +560,7 @@ describe('PowerOracle', function () {
       })
     });
 
-    it('sshould deny slasherUpdate right after deposit or withdraw', async function() {
+    it('should deny slasherUpdate right after deposit or withdraw', async function() {
       // 1st poke
       await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker });
       await time.increase(5);
@@ -668,6 +676,16 @@ describe('PowerOracle', function () {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(2, ['REP'], { from: validSlasherPoker }))
         .to.be.revertedWith('PAUSED');
+    });
+
+    it('should deny poking from a contract', async function() {
+      const data = oracle.contract.methods.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC']).encodeABI();
+      await expect(proxyCall.call(oracle.address, data)).to.be.revertedWith('CONTRACT_CALLS_DENIED');
+    });
+
+    it('should deny slasherUpdate from a contract', async function() {
+      const data = oracle.contract.methods.slasherUpdate(2).encodeABI();
+      await expect(proxyCall.call(oracle.address, data)).to.be.revertedWith('CONTRACT_CALLS_DENIED');
     });
 
     it('should deny slasher updating when the contract is paused', async function() {

@@ -151,6 +151,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice The current estimated gas expenses for updating a slasher status by pokeFromSlasher
   uint256 public gasExpensesForSlasherPokeStatusUpdate;
 
+  modifier denyContracts() {
+    require(msg.sender == tx.origin, 'CONTRACT_CALLS_DENIED');
+    _;
+  }
+
   constructor(
     address cvpToken_,
     address reservoir_,
@@ -326,7 +331,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param reporterId_ The valid reporter's user ID
    * @param symbols_ Asset symbols to poke
    */
-  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external override whenNotPaused {
+  function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external override whenNotPaused denyContracts {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -351,7 +356,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param slasherId_ The slasher's user ID
    * @param symbols_ Asset symbols to poke
    */
-  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external override whenNotPaused {
+  function pokeFromSlasher(uint256 slasherId_, string[] memory symbols_) external override whenNotPaused denyContracts {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -378,7 +383,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
   }
 
-  function slasherUpdate(uint256 slasherId_) external override whenNotPaused {
+  function slasherUpdate(uint256 slasherId_) external override whenNotPaused denyContracts {
     powerOracleStaking.authorizeSlasher(slasherId_, msg.sender);
 
     uint256 ethPrice = _fetchEthPrice();
