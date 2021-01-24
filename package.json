@@ -63,6 +63,7 @@
     "build": "yarn run compile && yarn run typechain",
     "clean": "hardhat clean",
     "compile": "hardhat compile",
+    "heck": "hardhat heck --network mainnet",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
     "deploy:testnet:local": "hardhat deploy-testnet --network local",
     "deploy:testnet:kovan": "hardhat deploy-testnet --network kovan",

@@ -9,19 +9,20 @@ require('./tasks/deployTestnet')
 require('./tasks/deployMainnet')
 require('./tasks/deployInstantUniswapPrice')
 require('./tasks/redeployOracleImplementation')
+require('./tasks/heck')
 
 
 const fs = require('fs');
 const homeDir = require('os').homedir();
 const _ = require('lodash');
 
-function getAccounts(network) {
-  const fileName = homeDir + '/.ethereum/' + network;
-  if(!fs.existsSync(fileName)) {
-    return [];
-  }
-  return [_.trim('0x' + fs.readFileSync(fileName, {encoding: 'utf8'}))];
-}
+// function getAccounts(network) {
+//   const fileName = homeDir + '/.ethereum/' + network;
+//   if(!fs.existsSync(fileName)) {
+//     return [];
+//   }
+//   return [_.trim('0x' + fs.readFileSync(fileName, {encoding: 'utf8'}))];
+// }
 
 const gasLimit = 12 * 10 ** 6;
 
@@ -51,10 +52,10 @@ const config = {
       allowUnlimitedContractSize: true
     },
     mainnet: {
-      url: 'https://mainnet-eth.compound.finance',
+      url: 'https://mainnet-eth.powerpool.finance',
       gasPrice: 81 * 10 ** 9,
       gasMultiplier: 1.5,
-      accounts: getAccounts('mainnet'),
+      // accounts: getAccounts('mainnet'),
       gas: gasLimit,
       blockGasLimit: gasLimit
     },

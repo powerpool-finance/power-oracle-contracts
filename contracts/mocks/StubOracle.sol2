@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.6.12;
+pragma experimental ABIEncoderV2;
+
+import "../PowerOracle.solx";
+
+contract StubOracle is PowerOracle {
+  constructor(
+    address cvpToken_,
+    address reservoir_,
+    address uniswapFactory_,
+    uint256 anchorPeriod_
+  ) public PowerOracle(cvpToken_, reservoir_, uniswapFactory_, anchorPeriod_) {}
+
+  function stubSetUserReward(uint256 userId_, uint256 reward_) external {
+    rewards[userId_] = reward_;
+  }
+
+  function stubSetPrice(bytes32 symbolHash_, address factory_, uint128 value_) external {
+//    prices[symbolHash_] = Price(uint128(block.timestamp), value_);
+    prices[symbolHash_][factory_] = value_;
+    priceUpdates[symbolHash_] = block.timestamp;
+  }
+}

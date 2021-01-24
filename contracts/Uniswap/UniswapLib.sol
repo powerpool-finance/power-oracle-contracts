@@ -2,7 +2,7 @@
 
 import "../interfaces/IUniswapV2Pair.sol";
 
-pragma solidity ^0.6.10;
+pragma solidity ^0.6.12;
 
 // Based on code from https://github.com/Uniswap/uniswap-v2-periphery
 

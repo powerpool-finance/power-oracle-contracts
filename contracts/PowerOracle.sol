@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerOracleStaking.sol";
-import "./interfaces/IPowerOracleStaking.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
@@ -19,11 +18,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   using SafeCast for uint256;
 
   uint256 public constant HUNDRED_PCT = 100 ether;
-
-  struct Price {
-    uint128 timestamp;
-    uint128 value;
-  }
 
   /// @notice The event emitted when a reporter calls a poke operation
   event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
@@ -109,48 +103,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice CVP reservoir which should pre-approve some amount of tokens to this contract in order to let pay rewards
   address public immutable reservoir;
 
-  /// @notice The linked PowerOracleStaking contract address
-  IPowerOracleStaking public powerOracleStaking;
-
-  /// @notice Min report interval in seconds
-  uint256 public minReportInterval;
-
-  /// @notice Max report interval in seconds
-  uint256 public maxReportInterval;
-
-  /// @notice The planned yield from a deposit in CVP tokens
-  uint256 public cvpReportAPY;
-
-  /// @notice The total number of reports for all pairs per year
-  uint256 public totalReportsPerYear;
-
-  /// @notice The current estimated gas expenses for reporting a single asset
-  uint256 public gasExpensesPerAssetReport;
-
-  /// @notice The maximum gas price to be used with gas compensation formula
-  uint256 public gasPriceLimit;
-
-  /// @notice The accrued reward by a user ID
-  mapping(uint256 => uint256) public rewards;
-
-  /// @notice Official prices and timestamps by symbol hash
-  mapping(bytes32 => Price) public prices;
-
-  /// @notice Last slasher update time by a user ID
-  mapping(uint256 => uint256) public lastSlasherUpdates;
-
-  /// @notice The current estimated gas expenses for updating a slasher status
-  uint256 public gasExpensesForSlasherStatusUpdate;
-
-  /// @notice The planned yield from a deposit in CVP tokens
-  uint256 public cvpSlasherUpdateAPY;
-
-  /// @notice The total number of slashers update per year
-  uint256 public totalSlasherUpdatesPerYear;
-
-  /// @notice The current estimated gas expenses for updating a slasher status by pokeFromSlasher
-  uint256 public gasExpensesForSlasherPokeStatusUpdate;
-
   modifier denyContracts() {
     require(msg.sender == tx.origin, 'CONTRACT_CALLS_DENIED');
     _;
@@ -159,9 +111,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   constructor(
     address cvpToken_,
     address reservoir_,
-    uint256 anchorPeriod_,
-    TokenConfig[] memory configs
-  ) public UniswapTWAPProvider(anchorPeriod_, configs) UniswapConfig(configs) {
+    address uniswapFactory_,
+    uint256 anchorPeriod_
+  ) public UniswapTWAPProvider(anchorPeriod_) TokenDetails(uniswapFactory_) {
     cvpToken = IERC20(cvpToken_);
     reservoir = reservoir_;
   }
@@ -199,20 +151,20 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function _fetchEthPrice() internal returns (uint256) {
     bytes32 symbolHash = keccak256(abi.encodePacked("ETH"));
     if (getIntervalStatus(symbolHash) == ReportInterval.LESS_THAN_MIN) {
-      return uint256(prices[symbolHash].value);
+      return uint256(prices[symbolHash][UNISWAP_FACTORY]);
     }
     uint256 ethPrice = fetchEthPrice();
-    _savePrice(symbolHash, ethPrice);
+    _savePrice(symbolHash, UNISWAP_FACTORY, ethPrice);
     return ethPrice;
   }
 
   function _fetchCvpPrice(uint256 ethPrice_) internal returns (uint256) {
     bytes32 symbolHash = keccak256(abi.encodePacked("CVP"));
     if (getIntervalStatus(symbolHash) == ReportInterval.LESS_THAN_MIN) {
-      return uint256(prices[symbolHash].value);
+      return uint256(prices[symbolHash][UNISWAP_FACTORY]);
     }
     uint256 cvpPrice = fetchCvpPrice(ethPrice_);
-    _savePrice(symbolHash, cvpPrice);
+    _savePrice(symbolHash, UNISWAP_FACTORY, cvpPrice);
     return cvpPrice;
   }
 
@@ -226,29 +178,36 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       return intervalStatus;
     }
 
-    uint256 price;
-    if (symbolHash == ethHash) {
-      price = ethPrice_;
-    } else {
-      price = fetchAnchorPrice(symbol_, config, ethPrice_);
-    }
+    uint256 factoriesLen = config.pairs.length;
+    for (uint256 i = 0; i < factoriesLen; i++) {
+      address factory = config.pairs[i];
+      uint256 price;
 
-    _savePrice(symbolHash, price);
+      if (symbolHash == ethHash) {
+        price = ethPrice_;
+      } else {
+        price = fetchAnchorPrice(symbol_, factory, config, ethPrice_);
+      }
+
+      _savePrice(symbolHash, factory, price);
+    }
 
     return intervalStatus;
   }
 
-  function _savePrice(bytes32 _symbolHash, uint256 price_) internal {
-    prices[_symbolHash] = Price(block.timestamp.toUint128(), price_.toUint128());
+  function _savePrice(bytes32 _symbolHash, address factory_, uint256 price_) internal {
+//    prices[_symbolHash][factory_] = Price(block.timestamp.toUint128(), price_.toUint128());
+    prices[_symbolHash][factory_] = price_;
+    priceUpdates[_symbolHash] = block.timestamp;
   }
 
-  function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
-    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
+  function priceInternal(address factory_, TokenConfig memory config_) internal view returns (uint256) {
+    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash][factory_];
     if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
     if (config_.priceSource == PriceSource.FIXED_ETH) {
-      uint256 usdPerEth = prices[ethHash].value;
+      uint256 usdPerEth = prices[ethHash][factory_];
       require(usdPerEth > 0, "ETH_PRICE_NOT_SET");
-      return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
+      return mul(usdPerEth, config_.fixedPrice) / ETH_BASE_UNIT;
     }
     revert("UNSUPPORTED_PRICE_CASE");
   }
@@ -571,7 +530,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   }
 
   function getIntervalStatus(bytes32 _symbolHash) public view returns (ReportInterval) {
-    uint256 delta = block.timestamp.sub(prices[_symbolHash].timestamp);
+//    uint256 delta = block.timestamp.sub(prices[_symbolHash].timestamp);
+    uint256 delta = block.timestamp.sub(priceUpdates[_symbolHash]);
 
     if (delta < minReportInterval) {
       return ReportInterval.LESS_THAN_MIN;
@@ -589,9 +549,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param token_ The token address for price retrieval
    * @return Price denominated in USD, with 6 decimals, for the given asset address
    */
-  function getPriceByAsset(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token_);
-    return priceInternal(config);
+  function getPriceByAsset(address factory_, address token_) external view override returns (uint256) {
+    TokenConfig memory config = tokenConfigs[token_];
+    return priceInternal(factory_, config);
   }
 
   /**
@@ -599,9 +559,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param symbol_ The symbol for price retrieval
    * @return Price denominated in USD, with 6 decimals
    */
-  function getPriceBySymbol(string calldata symbol_) external view override returns (uint256) {
+  function getPriceBySymbol(address factory_, string calldata symbol_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigBySymbol(symbol_);
-    return priceInternal(config);
+    return priceInternal(factory_, config);
   }
 
   /**
@@ -610,9 +570,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param symbolHash_ The symbol hash for price retrieval
    * @return Price denominated in USD, with 6 decimals, for the given asset address
    */
-  function getPriceBySymbolHash(bytes32 symbolHash_) external view override returns (uint256) {
+  function getPriceBySymbolHash(address factory_, bytes32 symbolHash_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash_);
-    return priceInternal(config);
+    return priceInternal(factory_, config);
   }
 
   /**
@@ -621,23 +581,11 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
    * @param cToken_ The cToken address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given cToken address
    */
-  function getUnderlyingPrice(address cToken_) external view override returns (uint256) {
+  function getUnderlyingPrice(address factory_, address cToken_) external view override returns (uint256) {
     TokenConfig memory config = getTokenConfigByCToken(cToken_);
     // Comptroller needs prices in the format: ${raw price} * 1e(36 - baseUnit)
     // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
-    return mul(1e30, priceInternal(config)) / config.baseUnit;
-  }
-
-  /**
-   * @notice Get the price by underlying address
-   * @dev Implements the old PriceOracle interface for Compound v2.
-   * @param token_ The underlying address for price retrieval
-   * @return Price denominated in USD, with 18 decimals, for the given underlying address
-   */
-  function assetPrices(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token_);
-    // Return price in the same format as getUnderlyingPrice, but by token address
-    return mul(1e30, priceInternal(config)) / config.baseUnit;
+    return mul(1e30, priceInternal(factory_, config)) / config.baseUnit;
   }
 
   function _min(uint256 a, uint256 b) internal pure returns (uint256) {

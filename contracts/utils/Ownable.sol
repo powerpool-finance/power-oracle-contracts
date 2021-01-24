@@ -3,7 +3,7 @@
 // A modified version of https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.2.0/contracts/access/Ownable.sol
 // with no GSN Context support and _transferOwnership internal method
 
-pragma solidity ^0.6.0;
+pragma solidity ^0.6.12;
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where

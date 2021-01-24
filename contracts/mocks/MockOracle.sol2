@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.0;
+pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../PowerOracle.sol";
+import "../PowerOracle.solx";
 
 contract MockOracle is PowerOracle {
   constructor(
     address cvpToken_,
     address reservoir_,
-    uint256 anchorPeriod_,
-    TokenConfig[] memory configs_
-  ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {}
+    address uniswapFactory_,
+    uint256 anchorPeriod_
+  ) public PowerOracle(cvpToken_, reservoir_, uniswapFactory_, anchorPeriod_) {}
 
   mapping(bytes32 => uint256) public mockedAnchorPrices;
 
@@ -19,14 +19,17 @@ contract MockOracle is PowerOracle {
     rewards[userId_] = reward_;
   }
 
-  function mockSetPrice(bytes32 symbolHash_, uint128 value_) external {
-    prices[symbolHash_] = Price(uint128(block.timestamp), value_);
+  function mockSetPrice(bytes32 symbolHash_, address factory_, uint128 value_) external {
+//    prices[symbolHash_] = Price(uint128(block.timestamp), value_);
+    prices[symbolHash_][factory_] = value_;
+    priceUpdates[symbolHash_] = block.timestamp;
   }
 
   event MockFetchMockedAnchorPrice(string symbol);
 
   function fetchAnchorPrice(
     string memory symbol,
+    address factory,
     TokenConfig memory config,
     uint256 conversionFactor
   ) internal override returns (uint256) {
@@ -35,7 +38,7 @@ contract MockOracle is PowerOracle {
       emit MockFetchMockedAnchorPrice(symbol);
       return mockedAnchorPrices[symbolHash];
     } else {
-      return super.fetchAnchorPrice(symbol, config, conversionFactor);
+      return super.fetchAnchorPrice(symbol, factory, config, conversionFactor);
     }
   }
 
