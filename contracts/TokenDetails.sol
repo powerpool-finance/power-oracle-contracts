@@ -20,37 +20,64 @@ contract TokenDetails is PowerOracleStorageV1 {
     UNISWAP_FACTORY = uniswapFactory_;
   }
 
-  function addTokens(TokenConfig[] memory tokenConfigs_, TradingPair[] memory pairs_) external {
+  function addTokens(TokenConfig[] memory tokenConfigs_, ExchangePair[][] memory tokenExchangesList_) external {
     uint256 len = tokenConfigs_.length;
+    require(len == tokenExchangesList_.length, "ARGUMENT_LENGTHS_MISMATCH");
 
     for (uint256 i = 0; i < len; i++) {
       TokenConfig memory tc = tokenConfigs_[i];
-      require(tc.symbolHash == keccak256(abi.encode(tc.symbol)), "INVALID_SYMBOL_HASH");
+      require(tc.symbolHash == keccak256(abi.encodePacked(tc.symbol)), "INVALID_SYMBOL_HASH");
       require(tokenConfigs[tc.token].token == address(0), "ALREADY_EXISTS");
       require(tc.baseUnit > 0, "BASE_UNIT_IS_NULL");
-      require(tc.pairs.length ==  pairs_.length, "PAIR_LENGTHS_MISMATCH");
-//      address uniswapMarket = tc.pairs;
-//      if (tc.priceSource == PriceSource.REPORTER) {
-//        require(uniswapMarket != address(0), "MARKET_IS_NULL");
-//      } else {
-//        require(uniswapMarket == address(0), "MARKET_IS_NOT_NULL");
-//      }
+      require(tc.exchanges.length ==  tokenExchangesList_[i].length, "EXCHANGE_LENGTHS_MISMATCH");
 
-      // TODO: assign each field
       tokenConfigs[tc.token] = tokenConfigs_[i];
 
       tokenByCToken[tc.cToken] = tc.token;
       tokenBySymbol[tc.symbol] = tc.token;
       tokenBySymbolHash[tc.symbolHash] = tc.token;
 
-      // TOOD: iterate and assign factories/pairs
+      uint256 tokenExchangesLen = tc.exchanges.length;
+      ExchangePair[] memory tExchanges = tokenExchangesList_[i];
+
+      // iterate over token exchanges
+      uint256 tExchangesLen = tExchanges.length;
+      for (uint256 j = 0; j < tExchangesLen; j++) {
+        ExchangePair memory ex = tExchanges[j];
+        require(validFactories[tc.exchanges[j]] == true, "INVALID_FACTORY");
+        if (tc.priceSource == PriceSource.REPORTER) {
+          require(ex.pair != address(0), "PAIR_IS_NULL");
+        } else {
+          require(ex.pair == address(0), "PAIR_IS_NOT_NULL");
+        }
+        tokenExchangeDetails[tc.token][tc.exchanges[j]] = ex;
+      }
+
+      tokens.push(tc.token);
     }
+    // TODO: add event
   }
 
-  function addFactories(address[] calldata factories_) external {
+  function addValidFactories(address[] calldata factories_) external {
     for (uint256 i = 0; i < factories_.length; i++) {
       validFactories[factories_[i]] = true;
     }
+    // TODO: add event
+  }
+
+  function getTokenExchanges(address token_) public view returns (ExchangePair[] memory) {
+    address[] memory exchanges = tokenConfigs[token_].exchanges;
+    uint256 len = exchanges.length;
+    ExchangePair[] memory results = new ExchangePair[](len);
+    for (uint256 i = 0; i < len; i++) {
+      results[i] = tokenExchangeDetails[token_][exchanges[i]];
+    }
+
+    return results;
+  }
+
+  function getTokenConfig(address token_) public view returns (TokenConfig memory) {
+    return tokenConfigs[token_];
   }
 
   function getTokenConfigBySymbolHash(bytes32 symbolHash_) public view returns (TokenConfig memory) {

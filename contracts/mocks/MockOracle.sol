@@ -3,7 +3,7 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "../PowerOracle.solx";
+import "../PowerOracle.sol";
 
 contract MockOracle is PowerOracle {
   constructor(

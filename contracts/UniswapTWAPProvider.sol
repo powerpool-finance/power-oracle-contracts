@@ -73,7 +73,7 @@ abstract contract UniswapTWAPProvider is TokenDetails {
 
     // Adjust rawUniswapPrice according to the units of the non-ETH asset
     // In the case of ETH, we would have to scale by 1e6 / USDC_UNITS, but since baseUnit2 is 1e6 (USDC), it cancels
-    if (tokenPairDetails[config.token][factory].isUniswapReversed) {
+    if (tokenExchangeDetails[config.token][factory].isReversed) {
       // unscaledPriceMantissa * ethBaseUnit / config.baseUnit / expScale, but we simplify bc ethBaseUnit == expScale
       anchorPrice = unscaledPriceMantissa / config.baseUnit;
     } else {
@@ -94,9 +94,9 @@ abstract contract UniswapTWAPProvider is TokenDetails {
    *  Update new and old observations of lagging window if period elapsed.
    */
   function pokeWindowValues(address factory_, TokenConfig memory config_) internal returns (uint256, uint256, uint256) {
-    TradingPair memory pair = tokenPairDetails[config_.token][factory_];
+    ExchangePair memory exchange = tokenExchangeDetails[config_.token][factory_];
 
-    (uint cumulativePrice0, uint cumulativePrice1,) = UniswapV2OracleLibrary.currentCumulativePrices(pair.pairContract);
+    (uint cumulativePrice0, uint cumulativePrice1,) = UniswapV2OracleLibrary.currentCumulativePrices(exchange.pair);
 
     // TODO: avoid redundant sload
     Observation memory lastObservation = getLastObservation(factory_, config_.token);
@@ -104,7 +104,7 @@ abstract contract UniswapTWAPProvider is TokenDetails {
     uint256 newCumulative;
     uint256 lastCumulative;
 
-    if (pair.isUniswapReversed) {
+    if (exchange.isReversed) {
       newCumulative = cumulativePrice1;
       lastCumulative = lastObservation.price1Cumulative;
     } else {

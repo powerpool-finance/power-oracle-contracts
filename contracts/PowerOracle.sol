@@ -178,9 +178,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       return intervalStatus;
     }
 
-    uint256 factoriesLen = config.pairs.length;
+    uint256 factoriesLen = config.exchanges.length;
     for (uint256 i = 0; i < factoriesLen; i++) {
-      address factory = config.pairs[i];
+      address factory = config.exchanges[i];
       uint256 price;
 
       if (symbolHash == ethHash) {

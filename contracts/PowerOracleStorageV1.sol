@@ -13,9 +13,9 @@ contract PowerOracleStorageV1 {
     REPORTER   /// implies the price is set by the reporter
   }
 
-  struct TradingPair {
-    address pairContract;
-    bool isUniswapReversed;
+  struct ExchangePair {
+    address pair;
+    bool isReversed;
   }
 
   struct TokenConfigMinimal {
@@ -37,7 +37,7 @@ contract PowerOracleStorageV1 {
     uint256 fixedPrice;
     string symbol;
 //    mapping(address => TradingPair) pairDetails;
-    address[] pairs;
+    address[] exchanges;
   }
 
   struct Observation {
@@ -67,6 +67,8 @@ contract PowerOracleStorageV1 {
   /// @notice The maximum gas price to be used with gas compensation formula
   uint256 public gasPriceLimit;
 
+  address[] public tokens;
+
   /// @notice The accrued reward by a user ID
   mapping(uint256 => uint256) public rewards;
 
@@ -91,15 +93,15 @@ contract PowerOracleStorageV1 {
   uint256 public gasExpensesForSlasherPokeStatusUpdate;
 
   mapping(address => bool) public validFactories;
-  // token => (factory => market)
-  mapping(address => mapping(address => TradingPair)) public tokenPairDetails;
+  // token => (exchangeFactory => pair)
+  mapping(address => mapping(address => ExchangePair)) public tokenExchangeDetails;
 
   mapping(address => address) public tokenByCToken;
   mapping(string => address) public tokenBySymbol;
   mapping(bytes32 => address) public tokenBySymbolHash;
 
   // token => TokenConfig, push-only
-  mapping(address => TokenConfig) public tokenConfigs;
+  mapping(address => TokenConfig) internal tokenConfigs;
 
   mapping(address => mapping(address=> Observation[])) public observations;
 }
