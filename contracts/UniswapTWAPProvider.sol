@@ -6,20 +6,15 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Uniswap/UniswapLib.sol";
 import "./TokenDetails.sol";
+import "hardhat/console.sol";
+
 
 abstract contract UniswapTWAPProvider is TokenDetails {
   using FixedPoint for *;
   using SafeMath for uint256;
 
-  /// @notice The number of wei in 1 ETH
-  uint public constant ETH_BASE_UNIT = 1e18;
-
   /// @notice A common scaling factor to maintain precision
   uint public constant EXP_SCALE = 1e18;
-
-  bytes32 internal constant cvpHash = keccak256(abi.encodePacked("CVP"));
-  bytes32 internal constant ethHash = keccak256(abi.encodePacked("ETH"));
-  bytes32 internal constant rotateHash = keccak256(abi.encodePacked("rotate"));
 
   /// @notice The event emitted when anchor price is updated
   event AnchorPriceUpdated(string symbol, bytes32 indexed symbolHash, uint anchorPrice, uint oldTimestamp, uint newTimestamp);
@@ -68,7 +63,7 @@ abstract contract UniswapTWAPProvider is TokenDetails {
     // Underflow is a property of the accumulators: https://uniswap.org/audit.html#orgc9b3190
     FixedPoint.uq112x112 memory priceAverage = FixedPoint.uq112x112(uint224((nowCumulativePrice - oldCumulativePrice) / timeElapsed));
     uint rawUniswapPriceMantissa = priceAverage.decode112with18();
-    uint unscaledPriceMantissa = mul(rawUniswapPriceMantissa, conversionFactor);
+    uint unscaledPriceMantissa = rawUniswapPriceMantissa.mul(conversionFactor);
     uint anchorPrice;
 
     // Adjust rawUniswapPrice according to the units of the non-ETH asset
@@ -77,7 +72,7 @@ abstract contract UniswapTWAPProvider is TokenDetails {
       // unscaledPriceMantissa * ethBaseUnit / config.baseUnit / expScale, but we simplify bc ethBaseUnit == expScale
       anchorPrice = unscaledPriceMantissa / config.baseUnit;
     } else {
-      anchorPrice = mul(unscaledPriceMantissa, config.baseUnit) / ETH_BASE_UNIT / EXP_SCALE;
+      anchorPrice = unscaledPriceMantissa.mul(config.baseUnit) / ETH_BASE_UNIT / EXP_SCALE;
     }
 
     emit AnchorPriceUpdated(symbol, keccak256(abi.encodePacked(symbol)), anchorPrice, oldTimestamp, block.timestamp);
@@ -85,8 +80,12 @@ abstract contract UniswapTWAPProvider is TokenDetails {
     return anchorPrice;
   }
 
-  function getLastObservation(address factory_, address token_) public view returns (Observation memory) {
-    return observations[factory_][token_][observations[factory_][token_].length - 1];
+  function getLastObservation(address factory_, address token_) public view returns (Observation memory observation) {
+    uint256 len = observations[factory_][token_].length;
+    if (len == 0) {
+      return observation;
+    }
+    return observations[factory_][token_][len - 1];
   }
 
   /**
@@ -119,13 +118,5 @@ abstract contract UniswapTWAPProvider is TokenDetails {
 //      emit UniswapWindowUpdated(config.symbolHash, lastObservation.timestamp, block.timestamp, lastObservation.acc, cumulativePrice);
     }
     return (newCumulative, lastCumulative, lastObservation.timestamp);
-  }
-
-  /// @dev Overflow proof multiplication
-  function mul(uint a, uint b) internal pure returns (uint) {
-    if (a == 0) return 0;
-    uint c = a * b;
-    require(c / a == b, "MUL_OVERFLOW");
-    return c;
   }
 }

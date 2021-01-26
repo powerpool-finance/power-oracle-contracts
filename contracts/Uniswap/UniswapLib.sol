@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import "../interfaces/IUniswapV2Pair.sol";
+import "hardhat/console.sol";
+
 
 pragma solidity ^0.6.12;
 

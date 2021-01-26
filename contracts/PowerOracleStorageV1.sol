@@ -29,8 +29,9 @@ contract PowerOracleStorageV1 {
   /// @dev Describe how the USD price should be determined for an asset.
   ///  There should be 1 TokenConfig object for each supported asset, passed in the constructor.
   struct TokenConfig {
-    address cToken;
+    bool deprecated;
     address token;
+    address cToken;
     bytes32 symbolHash;
     uint256 baseUnit;
     PriceSource priceSource;

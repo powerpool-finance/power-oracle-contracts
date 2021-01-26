@@ -1,4 +1,5 @@
 const chai = require('chai');
+const { buildToken, buildExchange, buildAddTokenArgs } = require("./localHelpers");
 const { expect } = chai;
 
 const MockCToken = artifacts.require('MockCToken');
@@ -30,38 +31,6 @@ const PriceSource = {
   REPORTER: '2', /// implies the price is set by the reporter
 };
 
-function buildToken(token, cToken, symbol, baseUnit, priceSource, fixedPrice, pairs) {
-  return {
-    token,
-    cToken,
-    symbol,
-    baseUnit,
-    priceSource,
-    fixedPrice,
-    pairs,
-  };
-}
-
-function buildPair(factory, pair, isReversed) {
-  return { factory, pair, isReversed };
-}
-
-function buildAddTokenArgs(tokenInputs) {
-  const tokens = [];
-  const pairs = [];
-
-  for (let i = 0; i < tokenInputs.length; i++) {
-    const token = Object.assign({}, tokenInputs[i]);
-    token.exchanges = token.pairs.map(p => p.factory);
-    token.symbolHash = web3.utils.keccak256(token.symbol);
-
-    pairs.push(token.pairs.map(p => { return { pair: p.pair, isReversed: p.isReversed }}));
-    delete token.pairs;
-    tokens.push(token);
-  }
-
-  return [ tokens, pairs ]
-}
 
 describe('TokenDetails', () => {
   let deployer;
@@ -74,19 +43,19 @@ describe('TokenDetails', () => {
     await contract.addValidFactories([UNISWAP_FACTORY, SUSHISWAP_FACTORY, FUZZYSWAP_FACTORY]);
 
     const token1 = buildToken(address(1), address(2), 'ETH', uint(1e18), PriceSource.REPORTER, 0, [
-      buildPair(UNISWAP_FACTORY, address(3), false),
+      buildExchange(UNISWAP_FACTORY, address(3), false),
     ]);
     const token2 = buildToken(address(4), address(5), 'USDC', uint(1e18), PriceSource.FIXED_USD, 1, []);
     const token3 = buildToken(address(7), address(8), 'REP', uint(1e9), PriceSource.REPORTER, 1, [
-      buildPair(UNISWAP_FACTORY, address(9), true),
-      buildPair(SUSHISWAP_FACTORY, address(10), false),
-      buildPair(FUZZYSWAP_FACTORY, address(11), false),
+      buildExchange(UNISWAP_FACTORY, address(9), true),
+      buildExchange(SUSHISWAP_FACTORY, address(10), false),
+      buildExchange(FUZZYSWAP_FACTORY, address(11), false),
     ]);
     const blah = buildAddTokenArgs([token1, token2, token3]);
     await contract.addTokens(...blah);
   });
 
-  describe.only('getTokenConfig()', () => {
+  describe('getTokenConfig()', () => {
     it('should provide token details for a token with a single pair', async () => {
       const token = address(1);
       (await Promise.all([

@@ -3,7 +3,7 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-interface IPowerOracle {
+interface IPowerOracleWriter {
   enum ReportInterval { LESS_THAN_MIN, OK, GREATER_THAN_MAX }
 
   function pokeFromReporter(uint256 reporterId_, string[] memory symbols_) external;
@@ -36,13 +36,4 @@ interface IPowerOracle {
   function pause() external;
 
   function unpause() external;
-
-  /*** Viewers ***/
-  function getPriceByAsset(address factory, address token) external view returns (uint256);
-
-  function getPriceBySymbol(address factory, string calldata symbol) external view returns (uint256);
-
-  function getPriceBySymbolHash(address factory, bytes32 symbolHash) external view returns (uint256);
-
-  function getUnderlyingPrice(address factory, address cToken) external view returns (uint256);
 }

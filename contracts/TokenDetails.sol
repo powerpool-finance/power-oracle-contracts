@@ -4,7 +4,6 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Uniswap/UniswapConfig.sol";
 import "./Uniswap/UniswapLib.sol";
 import "./PowerOracleStorageV1.sol";
@@ -13,6 +12,12 @@ import "./PowerOracleStorageV1.sol";
 contract TokenDetails is PowerOracleStorageV1 {
   using FixedPoint for *;
   using SafeMath for uint256;
+
+  /// @notice The number of wei in 1 ETH
+  uint public constant ETH_BASE_UNIT = 1e18;
+
+  bytes32 internal constant cvpHash = keccak256(abi.encodePacked("CVP"));
+  bytes32 internal constant ethHash = keccak256(abi.encodePacked("ETH"));
 
   address public immutable UNISWAP_FACTORY;
 
@@ -37,7 +42,6 @@ contract TokenDetails is PowerOracleStorageV1 {
       tokenBySymbol[tc.symbol] = tc.token;
       tokenBySymbolHash[tc.symbolHash] = tc.token;
 
-      uint256 tokenExchangesLen = tc.exchanges.length;
       ExchangePair[] memory tExchanges = tokenExchangesList_[i];
 
       // iterate over token exchanges
@@ -77,18 +81,22 @@ contract TokenDetails is PowerOracleStorageV1 {
   }
 
   function getTokenConfig(address token_) public view returns (TokenConfig memory) {
+    TokenConfig memory cfg = tokenConfigs[token_];
+    require(cfg.token == token_, "TOKEN_NOT_FOUND_1");
+    require(token_ != address(0), "TOKEN_NOT_FOUND_2");
+    require(cfg.deprecated == false, "TOKEN_DEPRECATED");
     return tokenConfigs[token_];
   }
 
   function getTokenConfigBySymbolHash(bytes32 symbolHash_) public view returns (TokenConfig memory) {
-    return tokenConfigs[tokenBySymbolHash[symbolHash_]];
+    return getTokenConfig(tokenBySymbolHash[symbolHash_]);
   }
 
   function getTokenConfigByCToken(address cToken_) public view returns (TokenConfig memory) {
-    return tokenConfigs[tokenByCToken[cToken_]];
+    return getTokenConfig(tokenByCToken[cToken_]);
   }
 
   function getTokenConfigBySymbol(string memory symbol_) public view returns (TokenConfig memory) {
-    return tokenConfigs[tokenBySymbol[symbol_]];
+    return getTokenConfig(tokenBySymbol[symbol_]);
   }
 }

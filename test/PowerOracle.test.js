@@ -1,6 +1,6 @@
 const { constants, time, expectEvent } = require('@openzeppelin/test-helpers');
 const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
-const { getTokenConfigs } = require('./localHelpers');
+const { factories, getTokenConfigs } = require('./localHelpers');
 
 const { solidity } = require('ethereum-waffle');
 
@@ -94,11 +94,14 @@ describe('PowerOracle', function () {
     staking = await MockStaking.new(cvpToken.address, reservoir);
     oracle = await deployProxied(
       StubOracle,
-      [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+      [cvpToken.address, reservoir, factories.UNISWAP_FACTORY, ANCHOR_PERIOD],
       [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
       { proxyAdminOwner: owner }
     );
 
+    await oracle.addValidFactories([factories.UNISWAP_FACTORY, factories.SUSHISWAP_FACTORY, factories.FUZZYSWAP_FACTORY]);
+    const tokenConfigs = await getTokenConfigs();
+    await oracle.addTokens(...tokenConfigs);
     await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
     await cvpToken.approve(oracle.address, ether(100000), { from: reservoir });
   });
@@ -108,7 +111,7 @@ describe('PowerOracle', function () {
       expect(await oracle.owner()).to.be.equal(owner);
       expect(await oracle.cvpToken()).to.be.equal(cvpToken.address);
       expect(await oracle.reservoir()).to.be.equal(reservoir);
-      expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
+      expect(await oracle.ANCHOR_PERIOD()).to.be.equal(ANCHOR_PERIOD);
       expect(await oracle.cvpReportAPY()).to.be.equal(CVP_REPORT_APY);
       expect(await oracle.cvpSlasherUpdateAPY()).to.be.equal(CVP_SLASHER_UPDATE_APY);
       expect(await oracle.totalReportsPerYear()).to.be.equal(TOTAL_REPORTS_PER_YEAR);
@@ -149,12 +152,12 @@ describe('PowerOracle', function () {
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
-        .to.be.revertedWith('TOKEN_NOT_FOUND');
+        .to.be.revertedWith('TOKEN_NOT_FOUND_2');
     });
 
     it('should deny poking with unknown token symbols', async function() {
       await expect(oracle.pokeFromReporter(1, ['FOO'], { from: validReporterPoker }))
-        .to.be.revertedWith('TOKEN_NOT_FOUND');
+        .to.be.revertedWith('TOKEN_NOT_FOUND_2');
     });
 
     it('should deny poking when the contract is paused', async function() {
@@ -165,17 +168,20 @@ describe('PowerOracle', function () {
 
     it('should deny poking from a contract', async function() {
       const data = oracle.contract.methods.pokeFromReporter(1, ['REP']).encodeABI();
-      await expect(proxyCall.call(oracle.address, data)).to.be.revertedWith('CONTRACT_CALLS_DENIED');
+      await expect(proxyCall.makeCall(oracle.address, data)).to.be.revertedWith('CONTRACT_CALLS_DENIED');
     });
 
     describe('rewards', () => {
       beforeEach(async function() {
         oracle = await deployProxied(
           MockOracle,
-          [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs()],
+          [cvpToken.address, reservoir, factories.UNISWAP_FACTORY, ANCHOR_PERIOD],
           [owner, staking.address, CVP_REPORT_APY, CVP_SLASHER_UPDATE_APY, TOTAL_REPORTS_PER_YEAR, TOTAL_SLASHER_UPDATES_PER_YEAR, GAS_EXPENSES_PER_ASSET_REPORT, GAS_EXPENSES_FOR_SLASHER_UPDATE, GAS_EXPENSES_FOR_POKE_SLASHER_UPDATE, GAS_PRICE_LIMIT, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL],
           { proxyAdminOwner: owner }
         );
+        await oracle.addValidFactories([factories.UNISWAP_FACTORY, factories.SUSHISWAP_FACTORY, factories.FUZZYSWAP_FACTORY]);
+        const tokenConfigs = await getTokenConfigs();
+        await oracle.addTokens(...tokenConfigs);
         await staking.setPowerOracle(oracle.address, { from: deployer });
         await oracle.mockSetAnchorPrice('ETH', mwei('320'));
         await oracle.mockSetAnchorPrice('CVP', mwei('5'));
@@ -285,7 +291,7 @@ describe('PowerOracle', function () {
         res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const thirdTimestamp = await getResTimestamp(res);
 
-        expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
+        expect(await oracle.priceUpdates(ETH_SYMBOL_HASH)).to.be.equal(thirdTimestamp);
         // 19.2 + 12.8
         expect(await oracle.rewards(1)).to.be.equal(ether('5.0784'));
 
@@ -329,7 +335,7 @@ describe('PowerOracle', function () {
         res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], { from: validReporterPoker, gasPrice: gwei(35) });
         const thirdTimestamp = await getResTimestamp(res);
 
-        expect((await oracle.prices(ETH_SYMBOL_HASH)).timestamp).to.be.equal(thirdTimestamp);
+        expect(await oracle.priceUpdates(ETH_SYMBOL_HASH)).to.be.equal(thirdTimestamp);
 
         expectMockedPriceUpdateEvent({
           response: res,
