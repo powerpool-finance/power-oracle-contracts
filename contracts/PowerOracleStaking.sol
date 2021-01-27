@@ -6,8 +6,8 @@ import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerOracleStaking.sol";
-import "./utils/Ownable.sol";
-import "./utils/Pausable.sol";
+import "./traits/Ownable.sol";
+import "./traits/Pausable.sol";
 
 contract PowerOracleStaking is IPowerOracleStaking, Ownable, Initializable, Pausable {
   using SafeMath for uint256;

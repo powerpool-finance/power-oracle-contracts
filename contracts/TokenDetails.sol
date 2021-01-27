@@ -4,12 +4,13 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./Uniswap/UniswapConfig.sol";
-import "./Uniswap/UniswapLib.sol";
+import "./Uniswap/UniswapV2OracleLibrary.sol";
 import "./PowerOracleStorageV1.sol";
+import "./traits/Ownable.sol";
+import "./lib/FixedPoint.sol";
 
 
-contract TokenDetails is PowerOracleStorageV1 {
+contract TokenDetails is PowerOracleStorageV1, Ownable {
   using FixedPoint for *;
   using SafeMath for uint256;
 
@@ -21,8 +22,12 @@ contract TokenDetails is PowerOracleStorageV1 {
 
   address public immutable UNISWAP_FACTORY;
 
-  constructor(address uniswapFactory_) public {
+  /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced
+  uint public immutable ANCHOR_PERIOD;
+
+  constructor(address uniswapFactory_, uint256 anchorPeriod_) public {
     UNISWAP_FACTORY = uniswapFactory_;
+    ANCHOR_PERIOD = anchorPeriod_;
   }
 
   function addTokens(TokenConfig[] memory tokenConfigs_, ExchangePair[][] memory tokenExchangesList_) external {

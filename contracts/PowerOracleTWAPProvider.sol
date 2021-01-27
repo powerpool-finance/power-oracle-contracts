@@ -4,12 +4,14 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./Uniswap/UniswapLib.sol";
+import "./Uniswap/UniswapV2OracleLibrary.sol";
+import "./lib/FixedPoint.sol";
 import "./TokenDetails.sol";
 import "hardhat/console.sol";
+import "./PowerOracleReader.sol";
 
 
-abstract contract UniswapTWAPProvider is TokenDetails {
+abstract contract PowerOracleTWAPProvider is PowerOracleReader {
   using FixedPoint for *;
   using SafeMath for uint256;
 
@@ -21,15 +23,6 @@ abstract contract UniswapTWAPProvider is TokenDetails {
 
   /// @notice The event emitted when the uniswap window changes
   event UniswapWindowUpdated(bytes32 indexed symbolHash, uint oldTimestamp, uint newTimestamp, uint oldPrice, uint newPrice);
-
-  /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced
-  uint public immutable ANCHOR_PERIOD;
-
-  constructor(
-    uint anchorPeriod_
-  ) public  {
-    ANCHOR_PERIOD = anchorPeriod_;
-  }
 
   /**
    * @dev Fetches the current eth/usd price from uniswap, with 6 decimals of precision.
@@ -78,14 +71,6 @@ abstract contract UniswapTWAPProvider is TokenDetails {
     emit AnchorPriceUpdated(symbol, keccak256(abi.encodePacked(symbol)), anchorPrice, oldTimestamp, block.timestamp);
 
     return anchorPrice;
-  }
-
-  function getLastObservation(address factory_, address token_) public view returns (Observation memory observation) {
-    uint256 len = observations[factory_][token_].length;
-    if (len == 0) {
-      return observation;
-    }
-    return observations[factory_][token_][len - 1];
   }
 
   /**

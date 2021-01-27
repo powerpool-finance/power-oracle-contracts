@@ -10,11 +10,10 @@ import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "./interfaces/IPowerOracleWriter.sol";
 import "./interfaces/IPowerOracleStaking.sol";
 import "./PowerOracleReader.sol";
-import "./UniswapTWAPProvider.sol";
-import "./utils/Pausable.sol";
-import "./utils/Ownable.sol";
+import "./PowerOracleTWAPProvider.sol";
+import "./traits/Pausable.sol";
 
-contract PowerOracle is IPowerOracleWriter, Ownable, Initializable, Pausable, UniswapTWAPProvider, PowerOracleReader {
+contract PowerOracle is IPowerOracleWriter, Initializable, Pausable, PowerOracleTWAPProvider {
   using SafeMath for uint256;
   using SafeCast for uint256;
 
@@ -114,7 +113,7 @@ contract PowerOracle is IPowerOracleWriter, Ownable, Initializable, Pausable, Un
     address reservoir_,
     address uniswapFactory_,
     uint256 anchorPeriod_
-  ) public UniswapTWAPProvider(anchorPeriod_) TokenDetails(uniswapFactory_) {
+  ) public TokenDetails(uniswapFactory_, anchorPeriod_) {
     cvpToken = IERC20(cvpToken_);
     reservoir = reservoir_;
   }
