@@ -2,17 +2,17 @@
 
 pragma solidity ^0.6.0;
 
-import "../PowerOracleStaking.sol";
+import "../PowerPokeStaking.sol";
 
-contract StubStaking is PowerOracleStaking {
-  constructor(address cvpToken_, address reservoir_) public PowerOracleStaking(cvpToken_, reservoir_) {}
+contract StubStaking is PowerPokeStaking {
+  constructor(address cvpToken_) public PowerPokeStaking(cvpToken_) {}
 
   function stubSetTotalDeposit(uint256 totalDeposit_) external {
     totalDeposit = totalDeposit_;
   }
 
   function stubSetReporter(uint256 userId_, uint256 highestDeposit_) external {
-    _reporterId = userId_;
+    _hdhId = userId_;
     _highestDeposit = highestDeposit_;
   }
 

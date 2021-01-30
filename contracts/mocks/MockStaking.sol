@@ -2,10 +2,10 @@
 
 pragma solidity ^0.6.0;
 
-import "../PowerOracleStaking.sol";
+import "../PowerPokeStaking.sol";
 
-contract MockStaking is PowerOracleStaking {
-  constructor(address cvpToken_, address reservoir_) public PowerOracleStaking(cvpToken_, reservoir_) {}
+contract MockStaking is PowerPokeStaking {
+  constructor(address cvpToken_) public PowerPokeStaking(cvpToken_) {}
 
   function mockSetTotalDeposit(uint256 totalDeposit_) external {
     totalDeposit = totalDeposit_;
@@ -13,12 +13,12 @@ contract MockStaking is PowerOracleStaking {
 
   event MockSlash(uint256 userId, uint256 overdueCount);
 
-  function slash(uint256 slasherId_, uint256 overdueCount_) external override(PowerOracleStaking) {
+  function slashHDH(uint256 slasherId_, uint256 overdueCount_) external override(PowerPokeStaking) {
     emit MockSlash(slasherId_, overdueCount_);
   }
 
   function mockSetReporter(uint256 userId_, uint256 highestDeposit_) external {
-    _reporterId = userId_;
+    _hdhId = userId_;
     _highestDeposit = highestDeposit_;
   }
 

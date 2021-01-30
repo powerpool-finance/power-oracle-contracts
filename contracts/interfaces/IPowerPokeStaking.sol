@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.6.10;
+pragma solidity ^0.6.12;
 
-interface IPowerOracleStaking {
-  enum UserStatus { UNAUTHORIZED, CAN_REPORT, CAN_SLASH }
+interface IPowerPokeStaking {
+  enum UserStatus { UNAUTHORIZED, HDH, MEMBER }
 
   /*** User Interface ***/
   function deposit(uint256 userId_, uint256 amount_) external;
@@ -29,9 +29,7 @@ interface IPowerOracleStaking {
   /*** Owner Interface ***/
   function withdrawExtraCVP(address to) external;
 
-  function setMinimalSlashingDeposit(uint256 amount) external;
-
-  function setPowerOracle(address powerOracle) external;
+  function setSlasher(address slasher) external;
 
   function setSlashingPct(uint256 slasherRewardPct, uint256 reservoirRewardPct) external;
 
@@ -40,23 +38,37 @@ interface IPowerOracleStaking {
   function unpause() external;
 
   /*** PowerOracle Contract Interface ***/
-  function slash(uint256 slasherId_, uint256 overdueCount_) external;
+  function slashHDH(uint256 slasherId_, uint256 amount_) external;
 
   /*** Permissionless Interface ***/
-  function setReporter(uint256 reporterId) external;
+  function setHDH(uint256 candidateId_) external;
 
   /*** Viewers ***/
-  function getReporterId() external view returns (uint256);
+  function getHDHID() external view returns (uint256);
 
   function getHighestDeposit() external view returns (uint256);
 
   function getDepositOf(uint256 userId) external view returns (uint256);
 
-  function getUserStatus(uint256 userId_, address reporterKey_) external view returns (UserStatus);
+  function getUserStatus(
+    uint256 userId_,
+    address reporterKey_,
+    uint256 minDeposit_
+  ) external view returns (UserStatus);
 
-  function authorizeReporter(uint256 userId_, address reporterKey_) external view;
+  function authorizeHDH(uint256 userId_, address reporterKey_) external view;
 
-  function authorizeSlasher(uint256 userId_, address reporterKey_) external view;
+  function authorizeNonHDH(
+    uint256 userId_,
+    address pokerKey_,
+    uint256 minDeposit_
+  ) external view;
+
+  function authorizeMember(
+    uint256 userId_,
+    address reporterKey_,
+    uint256 minDeposit_
+  ) external view;
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view;
 

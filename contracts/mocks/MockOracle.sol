@@ -11,13 +11,9 @@ contract MockOracle is PowerOracle {
     address reservoir_,
     uint256 anchorPeriod_,
     TokenConfig[] memory configs_
-  ) public PowerOracle(cvpToken_, reservoir_, anchorPeriod_, configs_) {}
+  ) public PowerOracle(cvpToken_, anchorPeriod_, configs_) {}
 
   mapping(bytes32 => uint256) public mockedAnchorPrices;
-
-  function mockSetUserReward(uint256 userId_, uint256 reward_) external {
-    rewards[userId_] = reward_;
-  }
 
   function mockSetPrice(bytes32 symbolHash_, uint128 value_) external {
     prices[symbolHash_] = Price(uint128(block.timestamp), value_);
