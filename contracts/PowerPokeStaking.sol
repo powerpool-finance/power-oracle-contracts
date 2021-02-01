@@ -128,8 +128,8 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
    * @param amount_ The amount in CVP tokens to deposit
    */
   function deposit(uint256 userId_, uint256 amount_) external override whenNotPaused {
-    require(amount_ > 0, "PowerOracleStaking::deposit: Missing amount");
-    require(users[userId_].adminKey != address(0), "PowerOracleStaking::deposit: Admin key can't be empty");
+    require(amount_ > 0, "PowerPokeStaking::deposit: Missing amount");
+    require(users[userId_].adminKey != address(0), "PowerPokeStaking::deposit: Admin key can't be empty");
 
     _deposit(userId_, amount_);
   }
@@ -172,14 +172,14 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address to_,
     uint256 amount_
   ) external override {
-    require(amount_ > 0, "PowerOracleStaking::withdraw: Missing amount");
-    require(to_ != address(0), "PowerOracleStaking::withdraw: Can't transfer to 0 address");
+    require(amount_ > 0, "PowerPokeStaking::withdraw: Missing amount");
+    require(to_ != address(0), "PowerPokeStaking::withdraw: Can't transfer to 0 address");
 
     User storage user = users[userId_];
-    require(msg.sender == user.adminKey, "PowerOracleStaking::withdraw: Only user's admin key allowed");
+    require(msg.sender == user.adminKey, "PowerPokeStaking::withdraw: Only user's admin key allowed");
 
     uint256 depositBefore = user.deposit;
-    require(amount_ <= depositBefore, "PowerOracleStaking::withdraw: Amount exceeds deposit");
+    require(amount_ <= depositBefore, "PowerPokeStaking::withdraw: Amount exceeds deposit");
 
     uint256 depositAfter = depositBefore - amount_;
     users[userId_].deposit = depositAfter;
@@ -224,7 +224,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_
   ) external override {
     User storage user = users[userId_];
-    require(msg.sender == user.adminKey, "PowerOracleStaking::updateUser: Only admin allowed");
+    require(msg.sender == user.adminKey, "PowerPokeStaking::updateUser: Only admin allowed");
 
     if (adminKey_ != user.adminKey) {
       user.adminKey = adminKey_;
@@ -280,7 +280,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
    * @param to_ The address to transfer the surplus
    */
   function withdrawExtraCVP(address to_) external override onlyOwner {
-    require(to_ != address(0), "PowerOracleStaking::withdrawExtraCVP: Cant withdraw to 0 address");
+    require(to_ != address(0), "PowerPokeStaking::withdrawExtraCVP: Cant withdraw to 0 address");
 
     uint256 erc20Balance = CVP_TOKEN.balanceOf(address(this));
     uint256 totalBalance = totalDeposit;
@@ -318,7 +318,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   {
     require(
       slasherSlashingRewardPct_.add(protocolSlashingRewardPct_) <= HUNDRED_PCT,
-      "PowerOracleStaking::setSlashingPct: Invalid reward sum"
+      "PowerPokeStaking::setSlashingPct: Invalid reward sum"
     );
 
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
@@ -351,10 +351,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     uint256 prevHdhId = _hdhId;
     uint256 currentReporterDeposit = users[prevHdhId].deposit;
 
-    require(
-      candidateDeposit > currentReporterDeposit,
-      "PowerOracleStaking::setReporter: Insufficient candidate deposit"
-    );
+    require(candidateDeposit > currentReporterDeposit, "PowerPokeStaking::setReporter: Insufficient candidate deposit");
 
     emit ReporterChange(prevHdhId, candidateId_, _highestDeposit, currentReporterDeposit, candidateDeposit);
     emit SetReporter(candidateId_, msg.sender);
@@ -392,8 +389,8 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   }
 
   function authorizeHDH(uint256 userId_, address pokerKey_) external view override {
-    require(userId_ == _hdhId, "PowerOracleStaking::authorizeHdh: Not the HDH");
-    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeHDH: Invalid poker key");
+    require(userId_ == _hdhId, "PowerPokeStaking::authorizeHdh: Not the HDH");
+    require(users[userId_].pokerKey == pokerKey_, "PowerPokeStaking::authorizeHDH: Invalid poker key");
   }
 
   function authorizeNonHDH(
@@ -401,7 +398,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_,
     uint256 minDeposit_
   ) external view override {
-    require(userId_ != _hdhId, "PowerOracleStaking::authorizeNonHDH: Is HDH");
+    require(userId_ != _hdhId, "PowerPokeStaking::authorizeNonHDH: Is HDH");
     authorizeMember(userId_, pokerKey_, minDeposit_);
   }
 
@@ -410,12 +407,12 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_,
     uint256 minDeposit_
   ) public view override {
-    require(users[userId_].deposit >= minDeposit_, "PowerOracleStaking::authorizeMember: Insufficient deposit");
-    require(users[userId_].pokerKey == pokerKey_, "PowerOracleStaking::authorizeMember: Invalid poker key");
+    require(users[userId_].deposit >= minDeposit_, "PowerPokeStaking::authorizeMember: Insufficient deposit");
+    require(users[userId_].pokerKey == pokerKey_, "PowerPokeStaking::authorizeMember: Invalid poker key");
   }
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
-    require(users[userId_].adminKey == adminKey_, "PowerOracleStaking::requireValidAdminKey: Invalid admin key");
+    require(users[userId_].adminKey == adminKey_, "PowerPokeStaking::requireValidAdminKey: Invalid admin key");
   }
 
   function getLastDepositChange(uint256 userId_) external view override returns (uint256) {

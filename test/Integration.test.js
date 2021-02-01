@@ -5,14 +5,14 @@ const { solidity } = require('ethereum-waffle');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
-const PowerOracleStaking = artifacts.require('PowerOracleStaking');
+const PowerPokeStaking = artifacts.require('PowerPokeStaking');
 const PowerOracle = artifacts.require('PowerOracle');
 
 chai.use(solidity);
 const { expect } = chai;
 
 MockCVP.numberFormat = 'String';
-PowerOracleStaking.numberFormat = 'String';
+PowerPokeStaking.numberFormat = 'String';
 PowerOracle.numberFormat = 'String';
 
 const ANCHOR_PERIOD = 30;
@@ -47,7 +47,7 @@ describe('IntegrationTest', function () {
 
   it('should allow stake, poke and slash', async function() {
     staking = await deployProxied(
-      PowerOracleStaking,
+      PowerPokeStaking,
       [cvpToken.address, reservoir],
       [owner, constants.ZERO_ADDRESS, MIN_SLASHING_DEPOSIT, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
       { proxyAdminOwner: owner }
@@ -171,7 +171,7 @@ describe('IntegrationTest', function () {
 
     // Withdraw stake
     await expect(staking.withdraw(aliceId, alice, ether(61), { from: alice }))
-      .to.be.revertedWith('PowerOracleStaking::withdraw: Amount exceeds deposit');
+      .to.be.revertedWith('PowerPokeStaking::withdraw: Amount exceeds deposit');
     await staking.withdraw(aliceId, alicePoker, ether(60), { from: alice });
     expect(await cvpToken.balanceOf(alicePoker)).to.be.equal(ether(60));
 

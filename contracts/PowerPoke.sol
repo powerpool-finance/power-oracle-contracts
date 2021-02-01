@@ -30,8 +30,6 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     uint256 maxReportInterval;
     uint256 slasherHeartbeat;
     uint256 gasPriceLimit;
-    uint256 pokeBonus;
-    uint256 slasherHeartbeatBonus;
     uint256 minPokerDeposit;
     uint256 minSlasherDeposit;
   }
@@ -40,19 +38,35 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     address indexed client,
     uint256 indexed userId,
     bool indexed rewardInETH,
-    uint256 amount,
-    uint256 bonus,
+    uint256 gasUsed,
+    uint256 gasPrice,
+    uint256 gasCompensationCVP,
+    uint256 bonusCVP,
     uint256 compensatedInETH,
-    uint256 deposit,
+    uint256 userDeposit,
     uint256 ethPrice,
     uint256 cvpPrice,
     uint256 calculatedReward
   );
 
+  struct CompensationPlan {
+    uint64 bonusNumerator;
+    uint64 bonusDenominator;
+    uint128 perGas;
+  }
+
   struct PokeRewardOptions {
     address to;
     bool rewardInEth;
-    // bool useChiToken;
+  }
+
+  struct RewardHelperStruct {
+    uint256 gasPrice;
+    uint256 ethPrice;
+    uint256 cvpPrice;
+    uint256 gasCompensationCVP;
+    uint256 bonusCVP;
+    uint256 totalCVPReward;
   }
 
   event SetReportIntervals(address indexed client, uint256 minReportInterval, uint256 maxReportInterval);
@@ -61,7 +75,13 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
 
   event SetSlasherHeartbeat(address indexed client, uint256 slasherHeartbeat);
 
-  event SetBonuses(address indexed client, uint256 pokeBonus, uint256 slasherHeartbeatBonus);
+  event SetCompensationPlan(
+    address indexed client,
+    uint256 planId,
+    uint64 bonusNominator,
+    uint64 bonsuDenominator,
+    uint128 perGas
+  );
 
   event SetMinimalDeposits(address indexed client, uint256 minPokerDeposit, uint256 minSlasherDeposit);
 
@@ -70,6 +90,12 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
   event AddCredit(address indexed client, uint256 amount);
 
   event WithdrawCredit(address indexed client, address indexed to, uint256 amount);
+
+  event SetOracle(address indexed oracle);
+
+  event AddClient(address indexed client, address indexed owner, bool canSlash_, uint256 gasPriceLimit_);
+
+  event SetClientActiveFlag(address indexed client_, bool indexed active);
 
   address public immutable WETH_TOKEN;
 
@@ -88,6 +114,8 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
   mapping(uint256 => uint256) public rewards;
 
   mapping(address => Client) public clients;
+
+  mapping(address => mapping(uint256 => CompensationPlan)) public compensationPlans;
 
   modifier onlyClientOwner(address client_) {
     require(clients[client_].owner == msg.sender, "ONLY_CLIENT_OWNER");
@@ -154,55 +182,66 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
   function reward(
     uint256 userId_,
     uint256 gasUsed_,
+    uint256 compensationPlan_,
     bytes calldata pokeOptions_
   ) external nonReentrant {
+    RewardHelperStruct memory helper;
     require(clients[msg.sender].active, "INVALID_CLIENT");
     if (gasUsed_ == 0) {
       return;
     }
-    uint256 ethPrice = oracle.getPriceByAsset(WETH_TOKEN);
-    uint256 cvpPrice = oracle.getPriceByAsset(address(CVP_TOKEN));
+    helper.ethPrice = oracle.getPriceByAsset(WETH_TOKEN);
+    helper.cvpPrice = oracle.getPriceByAsset(address(CVP_TOKEN));
 
-    uint256 compensation = getGasPriceFor(msg.sender)
-      .mul(gasUsed_)
-      .mul(ethPrice)
-      / cvpPrice;
+    helper.gasPrice = getGasPriceFor(msg.sender);
+    helper.gasCompensationCVP = helper.gasPrice.mul(gasUsed_).mul(helper.ethPrice) / helper.cvpPrice;
     uint256 userDeposit = POWER_POKE_STAKING.getDepositOf(userId_);
 
-    if (userDeposit == 0) {
-      return;
+    if (userDeposit != 0) {
+      helper.bonusCVP = getPokerBonus(msg.sender, compensationPlan_, gasUsed_, userDeposit);
     }
 
-    uint256 bonus = userDeposit.mul(clients[msg.sender].pokeBonus).mul(gasUsed_).div(HUNDRED_PCT).div(HUNDRED_K);
-
-    uint256 totalCVPReward = compensation.add(bonus);
-    clients[msg.sender].credit = clients[msg.sender].credit.sub(totalCVPReward);
+    helper.totalCVPReward = helper.gasCompensationCVP.add(helper.bonusCVP);
+    require(clients[msg.sender].credit >= helper.totalCVPReward, "NOT_ENOUGH_CREDITS");
+    clients[msg.sender].credit = clients[msg.sender].credit.sub(helper.totalCVPReward);
     uint256 compensatedInETH = 0;
 
     PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
 
     if (opts.rewardInEth) {
-      compensatedInETH = _payoutCompensationInETH(opts.to, compensation);
-      rewards[userId_] = rewards[userId_].add(bonus);
+      compensatedInETH = _payoutCompensationInETH(opts.to, helper.gasCompensationCVP);
+      rewards[userId_] = rewards[userId_].add(helper.bonusCVP);
     } else {
-      rewards[userId_] = rewards[userId_].add(totalCVPReward);
+      rewards[userId_] = rewards[userId_].add(helper.totalCVPReward);
     }
 
     emit RewardUser(
       msg.sender,
       userId_,
       opts.rewardInEth,
-      compensation,
-      bonus,
+      gasUsed_,
+      helper.gasPrice,
+      helper.gasCompensationCVP,
+      helper.bonusCVP,
       compensatedInETH,
       userDeposit,
-      ethPrice,
-      cvpPrice,
-      totalCVPReward
+      helper.ethPrice,
+      helper.cvpPrice,
+      helper.totalCVPReward
     );
   }
 
-  function addCredit(address client_, uint256 amount_) external onlyClientOwner(client_) {
+  function getPokerBonus(
+    address client_,
+    uint256 compensationPlanId_,
+    uint256 gasUsed_,
+    uint256 userDeposit_
+  ) public view returns (uint256) {
+    CompensationPlan memory plan = compensationPlans[client_][compensationPlanId_];
+    return (gasUsed_ / plan.perGas + 1).mul(userDeposit_).mul(plan.bonusNumerator).div(plan.bonusDenominator);
+  }
+
+  function addCredit(address client_, uint256 amount_) external {
     Client storage client = clients[client_];
 
     CVP_TOKEN.transferFrom(msg.sender, address(this), amount_);
@@ -230,6 +269,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     uint256 minReportInterval_,
     uint256 maxReportInterval_
   ) external onlyClientOwner(client_) {
+    require(minReportInterval_ > maxReportInterval_ && minReportInterval_ > 0, "INVALID_REPORT_INTERVALS");
     clients[client_].minReportInterval = minReportInterval_;
     clients[client_].maxReportInterval = maxReportInterval_;
     emit SetReportIntervals(client_, minReportInterval_, maxReportInterval_);
@@ -245,14 +285,15 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit SetGasPriceLimit(client_, gasPriceLimit_);
   }
 
-  function setBonuses(
+  function setCompensationPlan(
     address client_,
-    uint256 pokeBonus_,
-    uint256 slasherHeartbeatBonus_
+    uint256 planId_,
+    uint64 bonusNominator_,
+    uint64 bonusDenominator_,
+    uint128 perGas_
   ) external onlyClientOwner(client_) {
-    clients[client_].pokeBonus = pokeBonus_;
-    clients[client_].slasherHeartbeatBonus = slasherHeartbeatBonus_;
-    emit SetBonuses(client_, pokeBonus_, slasherHeartbeatBonus_);
+    compensationPlans[client_][planId_] = CompensationPlan(bonusNominator_, bonusDenominator_, perGas_);
+    emit SetCompensationPlan(client_, planId_, bonusNominator_, bonusDenominator_, perGas_);
   }
 
   function setMinimalDeposits(
@@ -275,6 +316,37 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     CVP_TOKEN.transfer(to_, rewardAmount);
 
     emit WithdrawRewards(userId_, to_, rewardAmount);
+  }
+
+  function addClient(
+    address client_,
+    address owner_,
+    bool canSlash_,
+    uint256 gasPriceLimit_,
+    uint256 minReportInterval_,
+    uint256 maxReportInterval_
+  ) external onlyOwner {
+    require(maxReportInterval_ > minReportInterval_ && minReportInterval_ > 0, "INVALID_REPORT_INTERVALS");
+
+    Client storage c = clients[client_];
+    c.active = true;
+    c.canSlash = canSlash_;
+    c.owner = owner_;
+    c.gasPriceLimit = gasPriceLimit_;
+    c.minReportInterval = minReportInterval_;
+    c.maxReportInterval = maxReportInterval_;
+
+    emit AddClient(client_, owner_, canSlash_, gasPriceLimit_);
+  }
+
+  function setClientActiveFlag(address client_, bool active_) external onlyOwner {
+    clients[client_].active = active_;
+    emit SetClientActiveFlag(client_, active_);
+  }
+
+  function setOracle(address oracle_) external onlyOwner {
+    oracle = IPowerOracle(oracle_);
+    emit SetOracle(oracle_);
   }
 
   function getMinMaxReportIntervals(address client_) external view returns (uint256 min, uint256 max) {

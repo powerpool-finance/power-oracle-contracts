@@ -13,6 +13,9 @@ import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
 import "./PowerPoke.sol";
 
+// Gas Compensation Plans:
+// 1 - for pokeFromReporter and slashReporter
+// 2 - for slasherHeartbeat
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
   using SafeCast for uint256;
@@ -55,16 +58,16 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
     _;
-    uint256 gasUsed = gasleft().sub(gasStart);
-    powerPoke.reward(reporterId_, gasUsed, rewardOpts);
+    uint256 gasUsed = gasStart.sub(gasleft());
+    powerPoke.reward(reporterId_, gasUsed, 1, rewardOpts);
   }
 
   modifier onlySlasher(uint256 slasherId_, bytes calldata rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizePoker(slasherId_, msg.sender);
     _;
-    uint256 gasUsed = gasleft().sub(gasStart);
-    powerPoke.reward(slasherId_, gasUsed, rewardOpts);
+    uint256 gasUsed = gasStart.sub(gasleft());
+    powerPoke.reward(slasherId_, gasUsed, 1, rewardOpts);
   }
 
   constructor(
@@ -172,6 +175,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       }
     }
 
+    require(rewardCount > 0, "NOTHING_UPDATED");
+
     emit PokeFromReporter(reporterId_, len, rewardCount);
   }
 
@@ -224,7 +229,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     PowerPoke.PokeRewardOptions memory opts = PowerPoke.PokeRewardOptions(msg.sender, false);
     bytes memory rewardConfig = abi.encode(opts);
     // reward in CVP
-    powerPoke.reward(slasherId_, gasleft().sub(gasStart), rewardConfig);
+    powerPoke.reward(slasherId_, gasStart.sub(gasleft()), 2, rewardConfig);
   }
 
   function _updateSlasherTimestamp(uint256 _slasherId, bool assertOnTimeDelta) internal {

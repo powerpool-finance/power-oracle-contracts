@@ -87,7 +87,7 @@ const config = {
     /* https://buidler.dev/buidler-evm/#solidity-optimizer-support */
     settings: {
       optimizer: {
-        enabled: true,
+        enabled: false,
         runs: 0,
       }
     },
