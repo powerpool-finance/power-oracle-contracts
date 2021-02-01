@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity ^0.6.12;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -47,6 +48,12 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     uint256 cvpPrice,
     uint256 calculatedReward
   );
+
+  struct PokeRewardOptions {
+    address to;
+    bool rewardInEth;
+    // bool useChiToken;
+  }
 
   event SetReportIntervals(address indexed client, uint256 minReportInterval, uint256 maxReportInterval);
 
@@ -147,19 +154,19 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
   function reward(
     uint256 userId_,
     uint256 gasUsed_,
-    address to_,
-    bool rewardInEth_
+    bytes calldata pokeOptions_
   ) external nonReentrant {
     require(clients[msg.sender].active, "INVALID_CLIENT");
     if (gasUsed_ == 0) {
       return;
     }
-
     uint256 ethPrice = oracle.getPriceByAsset(WETH_TOKEN);
     uint256 cvpPrice = oracle.getPriceByAsset(address(CVP_TOKEN));
 
-    uint256 gasPrice = Math.min(tx.gasprice, Math.min(_latestFastGas(), clients[msg.sender].gasPriceLimit));
-    uint256 compensation = gasPrice.mul(gasUsed_).mul(ethPrice) / cvpPrice;
+    uint256 compensation = getGasPriceFor(msg.sender)
+      .mul(gasUsed_)
+      .mul(ethPrice)
+      / cvpPrice;
     uint256 userDeposit = POWER_POKE_STAKING.getDepositOf(userId_);
 
     if (userDeposit == 0) {
@@ -172,8 +179,10 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     clients[msg.sender].credit = clients[msg.sender].credit.sub(totalCVPReward);
     uint256 compensatedInETH = 0;
 
-    if (rewardInEth_) {
-      compensatedInETH = _payoutCompensationInETH(to_, compensation);
+    PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
+
+    if (opts.rewardInEth) {
+      compensatedInETH = _payoutCompensationInETH(opts.to, compensation);
       rewards[userId_] = rewards[userId_].add(bonus);
     } else {
       rewards[userId_] = rewards[userId_].add(totalCVPReward);
@@ -182,7 +191,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit RewardUser(
       msg.sender,
       userId_,
-      rewardInEth_,
+      opts.rewardInEth,
       compensation,
       bonus,
       compensatedInETH,
@@ -289,5 +298,9 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
 
   function _latestFastGas() internal view returns (uint256) {
     return uint256(FAST_GAS_ORACLE.latestAnswer());
+  }
+
+  function getGasPriceFor(address client_) public view returns (uint256) {
+    return Math.min(tx.gasprice, Math.min(_latestFastGas(), clients[client_].gasPriceLimit));
   }
 }

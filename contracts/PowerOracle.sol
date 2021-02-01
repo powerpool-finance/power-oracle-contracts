@@ -51,20 +51,20 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice Last slasher update time by a user ID
   mapping(uint256 => uint256) public lastSlasherUpdates;
 
-  modifier onlyReporter(uint256 reporterId_, bool rewardInEth_) {
+  modifier onlyReporter(uint256 reporterId_, bytes calldata rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
     _;
     uint256 gasUsed = gasleft().sub(gasStart);
-    powerPoke.reward(reporterId_, gasUsed, msg.sender, rewardInEth_);
+    powerPoke.reward(reporterId_, gasUsed, rewardOpts);
   }
 
-  modifier onlySlasher(uint256 slasherId_, bool rewardInEth_) {
+  modifier onlySlasher(uint256 slasherId_, bytes calldata rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizePoker(slasherId_, msg.sender);
     _;
     uint256 gasUsed = gasleft().sub(gasStart);
-    powerPoke.reward(slasherId_, gasUsed, msg.sender, rewardInEth_);
+    powerPoke.reward(slasherId_, gasUsed, rewardOpts);
   }
 
   constructor(
@@ -154,8 +154,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function pokeFromReporter(
     uint256 reporterId_,
     string[] memory symbols_,
-    bool rewardInEth_
-  ) external override onlyReporter(reporterId_, rewardInEth_) whenNotPaused {
+    bytes calldata rewardOpts
+  ) external override onlyReporter(reporterId_, rewardOpts) whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -183,8 +183,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   function pokeFromSlasher(
     uint256 slasherId_,
     string[] memory symbols_,
-    bool rewardInEth_
-  ) external override onlySlasher(slasherId_, rewardInEth_) whenNotPaused {
+    bytes calldata rewardOpts
+  ) external override onlySlasher(slasherId_, rewardOpts) whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -208,12 +208,10 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       powerPoke.slashReporter(slasherId_, overdueCount);
 
       // update with no constraints
-      uint256 prevSlasherUpdate = lastSlasherUpdates[slasherId_];
-      lastSlasherUpdates[slasherId_] = block.timestamp;
-      emit UpdateSlasher(slasherId_, prevSlasherUpdate, block.timestamp);
+      _updateSlasherTimestamp(slasherId_, false);
     } else {
       // treat it as a slasherHeartbeat call
-      _updateSlasherTimestamp(slasherId_);
+      _updateSlasherTimestamp(slasherId_, true);
     }
   }
 
@@ -221,17 +219,21 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 gasStart = gasleft();
     powerPoke.authorizeNonReporter(slasherId_, msg.sender);
 
-    _updateSlasherTimestamp(slasherId_);
+    _updateSlasherTimestamp(slasherId_, true);
 
+    PowerPoke.PokeRewardOptions memory opts = PowerPoke.PokeRewardOptions(msg.sender, false);
+    bytes memory rewardConfig = abi.encode(opts);
     // reward in CVP
-    powerPoke.reward(slasherId_, gasleft().sub(gasStart), msg.sender, false);
+    powerPoke.reward(slasherId_, gasleft().sub(gasStart), rewardConfig);
   }
 
-  function _updateSlasherTimestamp(uint256 _slasherId) internal {
+  function _updateSlasherTimestamp(uint256 _slasherId, bool assertOnTimeDelta) internal {
     uint256 prevSlasherUpdate = lastSlasherUpdates[_slasherId];
-    uint256 delta = block.timestamp.sub(prevSlasherUpdate);
 
-    require(delta >= powerPoke.getSlasherHeartbeat(address(this)), "BELOW_HEARTBEAT_INTERVAL");
+    if (assertOnTimeDelta) {
+      uint256 delta = block.timestamp.sub(prevSlasherUpdate);
+      require(delta >= powerPoke.getSlasherHeartbeat(address(this)), "BELOW_HEARTBEAT_INTERVAL");
+    }
 
     lastSlasherUpdates[_slasherId] = block.timestamp;
     emit UpdateSlasher(_slasherId, prevSlasherUpdate, block.timestamp);

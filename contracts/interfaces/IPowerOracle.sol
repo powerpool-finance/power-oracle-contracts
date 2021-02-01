@@ -9,13 +9,13 @@ interface IPowerOracle {
   function pokeFromReporter(
     uint256 reporterId_,
     string[] memory symbols_,
-    bool rewardInEth_
+    bytes calldata rewardOpts
   ) external;
 
   function pokeFromSlasher(
     uint256 slasherId_,
     string[] memory symbols_,
-    bool rewardInEth_
+    bytes calldata rewardOpts
   ) external;
 
   function poke(string[] memory symbols_) external;
