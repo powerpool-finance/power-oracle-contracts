@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Uniswap/UniswapConfig.sol";
 import "./Uniswap/UniswapLib.sol";
 
-
 abstract contract UniswapTWAPProvider is UniswapConfig {
   using FixedPoint for *;
   using SafeMath for uint256;

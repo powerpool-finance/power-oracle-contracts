@@ -40,7 +40,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   event SetPowerPoke(address powerPoke);
 
   /// @notice The event emitted when the slasher timestamps are updated
-  event UpdateSlasher(uint256 indexed slasherId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
+  event SlasherHeartbeat(uint256 indexed slasherId, uint256 prevSlasherTimestamp, uint256 newSlasherTimestamp);
 
   /// @notice CVP token address
   IERC20 public immutable CVP_TOKEN;
@@ -60,14 +60,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     _;
     uint256 gasUsed = gasStart.sub(gasleft());
     powerPoke.reward(reporterId_, gasUsed, 1, rewardOpts);
-  }
-
-  modifier onlySlasher(uint256 slasherId_, bytes calldata rewardOpts) {
-    uint256 gasStart = gasleft();
-    powerPoke.authorizePoker(slasherId_, msg.sender);
-    _;
-    uint256 gasUsed = gasStart.sub(gasleft());
-    powerPoke.reward(slasherId_, gasUsed, 1, rewardOpts);
   }
 
   constructor(
@@ -189,7 +181,9 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 slasherId_,
     string[] memory symbols_,
     bytes calldata rewardOpts
-  ) external override onlySlasher(slasherId_, rewardOpts) whenNotPaused {
+  ) external override whenNotPaused {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeNonReporter(slasherId_, msg.sender);
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -207,17 +201,19 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       }
     }
 
-    emit PokeFromSlasher(slasherId_, len, overdueCount);
-
+    // update with no constraints, compensate & reward
     if (overdueCount > 0) {
       powerPoke.slashReporter(slasherId_, overdueCount);
-
-      // update with no constraints
       _updateSlasherTimestamp(slasherId_, false);
+
+      uint256 gasUsed = gasStart.sub(gasleft());
+      powerPoke.reward(slasherId_, gasUsed, 1, rewardOpts);
     } else {
-      // treat it as a slasherHeartbeat call
+      // treat it as a slasherHeartbeat call, do neither compensate nor reward
       _updateSlasherTimestamp(slasherId_, true);
     }
+
+    emit PokeFromSlasher(slasherId_, len, overdueCount);
   }
 
   function slasherHeartbeat(uint256 slasherId_) external override whenNotPaused {
@@ -241,7 +237,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     }
 
     lastSlasherUpdates[_slasherId] = block.timestamp;
-    emit UpdateSlasher(_slasherId, prevSlasherUpdate, block.timestamp);
+    emit SlasherHeartbeat(_slasherId, prevSlasherUpdate, block.timestamp);
   }
 
   /**

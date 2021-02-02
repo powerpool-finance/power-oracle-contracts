@@ -37,7 +37,8 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
   event RewardUser(
     address indexed client,
     uint256 indexed userId,
-    bool indexed rewardInETH,
+    uint256 indexed compensationPlan,
+    bool rewardInETH,
     uint256 gasUsed,
     uint256 gasPrice,
     uint256 gasCompensationCVP,
@@ -67,6 +68,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     uint256 gasCompensationCVP;
     uint256 bonusCVP;
     uint256 totalCVPReward;
+    uint256 compensatedInETH;
   }
 
   event SetReportIntervals(address indexed client, uint256 minReportInterval, uint256 maxReportInterval);
@@ -204,12 +206,11 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     helper.totalCVPReward = helper.gasCompensationCVP.add(helper.bonusCVP);
     require(clients[msg.sender].credit >= helper.totalCVPReward, "NOT_ENOUGH_CREDITS");
     clients[msg.sender].credit = clients[msg.sender].credit.sub(helper.totalCVPReward);
-    uint256 compensatedInETH = 0;
 
     PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
 
     if (opts.rewardInEth) {
-      compensatedInETH = _payoutCompensationInETH(opts.to, helper.gasCompensationCVP);
+      helper.compensatedInETH = _payoutCompensationInETH(opts.to, helper.gasCompensationCVP);
       rewards[userId_] = rewards[userId_].add(helper.bonusCVP);
     } else {
       rewards[userId_] = rewards[userId_].add(helper.totalCVPReward);
@@ -218,12 +219,13 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit RewardUser(
       msg.sender,
       userId_,
+      compensationPlan_,
       opts.rewardInEth,
       gasUsed_,
       helper.gasPrice,
       helper.gasCompensationCVP,
       helper.bonusCVP,
-      compensatedInETH,
+      helper.compensatedInETH,
       userDeposit,
       helper.ethPrice,
       helper.cvpPrice,
@@ -335,6 +337,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     c.gasPriceLimit = gasPriceLimit_;
     c.minReportInterval = minReportInterval_;
     c.maxReportInterval = maxReportInterval_;
+    c.slasherHeartbeat = uint256(-1);
 
     emit AddClient(client_, owner_, canSlash_, gasPriceLimit_);
   }
