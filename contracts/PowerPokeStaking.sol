@@ -103,6 +103,8 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   mapping(uint256 => uint256) internal _lastDepositChange;
 
   constructor(address cvpToken_) public {
+    require(cvpToken_ != address(0), "CVP_ADDR_IS_0");
+
     CVP_TOKEN = IERC20(cvpToken_);
   }
 

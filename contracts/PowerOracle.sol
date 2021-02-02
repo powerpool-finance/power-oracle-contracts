@@ -203,8 +203,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
     // update with no constraints, compensate & reward
     if (overdueCount > 0) {
-      powerPoke.slashReporter(slasherId_, overdueCount);
       _updateSlasherTimestamp(slasherId_, false);
+      powerPoke.slashReporter(slasherId_, overdueCount);
 
       uint256 gasUsed = gasStart.sub(gasleft());
       powerPoke.reward(slasherId_, gasUsed, 1, rewardOpts);

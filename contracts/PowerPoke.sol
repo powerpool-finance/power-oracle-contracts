@@ -131,6 +131,12 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     address uniswapRouter_,
     address powerPokeStaking_
   ) public {
+    require(cvpToken_ != address(0), "CVP_ADDR_IS_0");
+    require(wethToken_ != address(0), "WETH_ADDR_IS_0");
+    require(fastGasOracle_ != address(0), "FAST_GAS_ORACLE_IS_0");
+    require(uniswapRouter_ != address(0), "UNISWAP_ROUTER_IS_0");
+    require(powerPokeStaking_ != address(0), "POWER_POKE_STAKING_ADDR_IS_0");
+
     CVP_TOKEN = IERC20(cvpToken_);
     WETH_TOKEN = wethToken_;
     FAST_GAS_ORACLE = IEACAggregatorProxy(fastGasOracle_);
@@ -143,6 +149,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     oracle = IPowerOracle(oracle_);
   }
 
+  /*** CLIENT'S CONTRACT INTERFACE ***/
   function authorizeReporter(uint256 userId_, address pokerKey_) external view {
     POWER_POKE_STAKING.authorizeHDH(userId_, pokerKey_);
   }
@@ -171,7 +178,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     POWER_POKE_STAKING.authorizeMember(userId_, pokerKey_, overrideMinStake_);
   }
 
-  function slashReporter(uint256 userId_, uint256 amount_) external {
+  function slashReporter(uint256 userId_, uint256 amount_) external nonReentrant {
     require(clients[msg.sender].active, "INVALID_CLIENT");
     require(clients[msg.sender].canSlash, "CANT_SLASH");
     if (amount_ == 0) {
@@ -233,21 +240,13 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     );
   }
 
-  function getPokerBonus(
-    address client_,
-    uint256 compensationPlanId_,
-    uint256 gasUsed_,
-    uint256 userDeposit_
-  ) public view returns (uint256) {
-    CompensationPlan memory plan = compensationPlans[client_][compensationPlanId_];
-    return (gasUsed_ / plan.perGas + 1).mul(userDeposit_).mul(plan.bonusNumerator).div(plan.bonusDenominator);
-  }
-
+  /*** CLIENT OWNER INTERFACE ***/
   function addCredit(address client_, uint256 amount_) external {
     Client storage client = clients[client_];
 
     CVP_TOKEN.transferFrom(msg.sender, address(this), amount_);
     client.credit = client.credit.add(amount_);
+    totalCredits = totalCredits.add(amount_);
 
     emit AddCredit(client_, amount_);
   }
@@ -260,6 +259,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     Client storage client = clients[client_];
 
     client.credit = client.credit.sub(amount_);
+    totalCredits = totalCredits.sub(amount_);
 
     CVP_TOKEN.transfer(to_, amount_);
 
@@ -308,6 +308,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit SetMinimalDeposits(client_, minPokerDeposit_, minSlasherDeposit_);
   }
 
+  /*** POKER INTERFACE ***/
   function withdrawRewards(uint256 userId_, address to_) external {
     POWER_POKE_STAKING.requireValidAdminKey(userId_, msg.sender);
     require(to_ != address(0), "0_ADDRESS");
@@ -320,6 +321,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit WithdrawRewards(userId_, to_, rewardAmount);
   }
 
+  /*** OWNER INTERFACE ***/
   function addClient(
     address client_,
     address owner_,
@@ -352,14 +354,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit SetOracle(oracle_);
   }
 
-  function getMinMaxReportIntervals(address client_) external view returns (uint256 min, uint256 max) {
-    return (clients[client_].minReportInterval, clients[client_].maxReportInterval);
-  }
-
-  function getSlasherHeartbeat(address client_) external view returns (uint256) {
-    return clients[client_].slasherHeartbeat;
-  }
-
+  /*** INTERNAL HELPERS ***/
   function _payoutCompensationInETH(address _to, uint256 _cvpAmount) internal returns (uint256) {
     CVP_TOKEN.approve(address(UNISWAP_ROUTER), _cvpAmount);
 
@@ -373,6 +368,25 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
 
   function _latestFastGas() internal view returns (uint256) {
     return uint256(FAST_GAS_ORACLE.latestAnswer());
+  }
+
+  /*** GETTERS ***/
+  function getMinMaxReportIntervals(address client_) external view returns (uint256 min, uint256 max) {
+    return (clients[client_].minReportInterval, clients[client_].maxReportInterval);
+  }
+
+  function getSlasherHeartbeat(address client_) external view returns (uint256) {
+    return clients[client_].slasherHeartbeat;
+  }
+
+  function getPokerBonus(
+    address client_,
+    uint256 compensationPlanId_,
+    uint256 gasUsed_,
+    uint256 userDeposit_
+  ) public view returns (uint256) {
+    CompensationPlan memory plan = compensationPlans[client_][compensationPlanId_];
+    return (gasUsed_ / plan.perGas + 1).mul(userDeposit_).mul(plan.bonusNumerator).div(plan.bonusDenominator);
   }
 
   function getGasPriceFor(address client_) public view returns (uint256) {
