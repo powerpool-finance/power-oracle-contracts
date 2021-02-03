@@ -117,7 +117,9 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
   constructor(
     address cvpToken_,
+  // TODO: move to initializer
     uint256 depositTimeout_,
+  // TODO: move to initializer
     uint256 withdrawTimeout_
   ) public {
     require(cvpToken_ != address(0), "CVP_ADDR_IS_0");

@@ -38,7 +38,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     address indexed client,
     uint256 indexed userId,
     uint256 indexed compensationPlan,
-    bool rewardInETH,
+    bool compensationInETH,
     uint256 gasUsed,
     uint256 gasPrice,
     uint256 gasCompensationCVP,
@@ -58,7 +58,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
 
   struct PokeRewardOptions {
     address to;
-    bool rewardInEth;
+    bool compensationInETH;
   }
 
   struct RewardHelperStruct {
@@ -216,7 +216,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
 
     PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
 
-    if (opts.rewardInEth) {
+    if (opts.compensationInETH) {
       helper.compensatedInETH = _payoutCompensationInETH(opts.to, helper.gasCompensationCVP);
       rewards[userId_] = rewards[userId_].add(helper.bonusCVP);
     } else {
@@ -227,7 +227,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
       msg.sender,
       userId_,
       compensationPlan_,
-      opts.rewardInEth,
+      opts.compensationInETH,
       gasUsed_,
       helper.gasPrice,
       helper.gasCompensationCVP,
@@ -277,7 +277,7 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     emit SetReportIntervals(client_, minReportInterval_, maxReportInterval_);
   }
 
-  function setSlasherHearbeat(address client_, uint256 slasherHeartbeat_) external onlyClientOwner(client_) {
+  function setSlasherHeartbeat(address client_, uint256 slasherHeartbeat_) external onlyClientOwner(client_) {
     clients[client_].slasherHeartbeat = slasherHeartbeat_;
     emit SetSlasherHeartbeat(client_, slasherHeartbeat_);
   }
@@ -386,10 +386,16 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     uint256 userDeposit_
   ) public view returns (uint256) {
     CompensationPlan memory plan = compensationPlans[client_][compensationPlanId_];
-    return (gasUsed_ / plan.perGas + 1).mul(userDeposit_).mul(plan.bonusNumerator).div(plan.bonusDenominator);
+    return (gasUsed_).mul(userDeposit_).mul(plan.bonusNumerator).div(plan.bonusDenominator) + 1 / plan.perGas + 1;
   }
 
   function getGasPriceFor(address client_) public view returns (uint256) {
-    return Math.min(tx.gasprice, Math.min(_latestFastGas(), clients[client_].gasPriceLimit));
+    return Math.min(
+      tx.gasprice,
+      Math.min(
+        _latestFastGas(),
+        clients[client_].gasPriceLimit
+      )
+    );
   }
 }

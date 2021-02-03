@@ -42,9 +42,6 @@ const config = {
     timeout: 20000
   },
   networks: {
-    // buidlerevm: {
-    //   chainId: 31337,
-    // },
     hardhat: {
       gas: gasLimit,
       blockGasLimit: gasLimit,
