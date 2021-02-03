@@ -6,13 +6,13 @@ interface IPowerPokeStaking {
   enum UserStatus { UNAUTHORIZED, HDH, MEMBER }
 
   /*** User Interface ***/
-  function deposit(uint256 userId_, uint256 amount_) external;
+  function createDeposit(uint256 userId_, uint256 amount_) external;
 
-  function withdraw(
-    uint256 userId_,
-    address to_,
-    uint256 amount_
-  ) external;
+  function executeDeposit(uint256 userId_) external;
+
+  function createWithdrawal(uint256 userId_, uint256 amount_) external;
+
+  function executeWithdrawal(uint256 userId_, address to_) external;
 
   function createUser(
     address adminKey_,
@@ -27,8 +27,6 @@ interface IPowerPokeStaking {
   ) external;
 
   /*** Owner Interface ***/
-  function withdrawExtraCVP(address to) external;
-
   function setSlasher(address slasher) external;
 
   function setSlashingPct(uint256 slasherRewardPct, uint256 reservoirRewardPct) external;
@@ -38,7 +36,7 @@ interface IPowerPokeStaking {
   function unpause() external;
 
   /*** PowerOracle Contract Interface ***/
-  function slashHDH(uint256 slasherId_, uint256 amount_) external;
+  function slashHDH(uint256 slasherId_, uint256 times_) external;
 
   /*** Permissionless Interface ***/
   function setHDH(uint256 candidateId_) external;
@@ -49,6 +47,10 @@ interface IPowerPokeStaking {
   function getHighestDeposit() external view returns (uint256);
 
   function getDepositOf(uint256 userId) external view returns (uint256);
+
+  function getPendingDepositOf(uint256 userId_) external view returns (uint256 balance, uint256 timeout);
+
+  function getPendingWithdrawalOf(uint256 userId_) external view returns (uint256 balance, uint256 timeout);
 
   function getUserStatus(
     uint256 userId_,

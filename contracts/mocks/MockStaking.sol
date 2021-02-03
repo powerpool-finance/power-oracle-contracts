@@ -5,16 +5,20 @@ pragma solidity ^0.6.0;
 import "../PowerPokeStaking.sol";
 
 contract MockStaking is PowerPokeStaking {
-  constructor(address cvpToken_) public PowerPokeStaking(cvpToken_) {}
+  constructor(
+    address cvpToken_,
+    uint256 depositTimeout_,
+    uint256 withdrawTimeout_
+  ) public PowerPokeStaking(cvpToken_, depositTimeout_, withdrawTimeout_) {}
 
   function mockSetTotalDeposit(uint256 totalDeposit_) external {
     totalDeposit = totalDeposit_;
   }
 
-  event MockSlash(uint256 userId, uint256 overdueCount);
+  event MockSlash(uint256 userId, uint256 times);
 
-  function slashHDH(uint256 slasherId_, uint256 overdueCount_) external override(PowerPokeStaking) {
-    emit MockSlash(slasherId_, overdueCount_);
+  function slashHDH(uint256 slasherId_, uint256 times_) external override(PowerPokeStaking) {
+    emit MockSlash(slasherId_, times_);
   }
 
   function mockSetReporter(uint256 userId_, uint256 highestDeposit_) external {

@@ -27,6 +27,8 @@ const MIN_REPORT_INTERVAL_INT = 30;
 const MAX_REPORT_INTERVAL = '90';
 const MAX_REPORT_INTERVAL_INT = 90;
 const SLASHER_HEARTBEAT_INTERVAL = 120;
+const DEPOSIT_TIMEOUT = '30';
+const WITHDRAWAL_TIMEOUT = '180';
 const WETH = address(111);
 
 function expectPriceUpdateEvent(config) {
@@ -68,10 +70,10 @@ describe('PowerOracle', function () {
   let fastGasOracle;
   let powerPokeOpts;
 
-  let deployer, owner, oracleClientOwner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink, uniswapRouter;
+  let deployer, owner, oracleClientOwner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink, uniswapRouter;
 
   before(async function() {
-    [deployer, owner, oracleClientOwner, reservoir, alice, bob, dan, danSlasher, validReporterPoker, validSlasherPoker, sink, uniswapRouter] = await web3.eth.getAccounts();
+    [deployer, owner, oracleClientOwner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink, uniswapRouter] = await web3.eth.getAccounts();
     fastGasOracle = await MockFastGasOracle.new(gwei(300 * 1000));
 
     powerPokeOpts = web3.eth.abi.encodeParameter(
@@ -90,7 +92,7 @@ describe('PowerOracle', function () {
 
   beforeEach(async function() {
     cvpToken = await MockCVP.new(ether(1000000));
-    staking = await MockStaking.new(cvpToken.address);
+    staking = await MockStaking.new(cvpToken.address, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT);
 
     // poke = await PowerPoke.new(cvpToken.address, WETH, fastGasOracle.address, uniswapRouter, staking.address);
     poke = await deployProxied(
@@ -144,7 +146,7 @@ describe('PowerOracle', function () {
 
     it('should deny another user calling an behalf of reporter', async function() {
       await expect(oracle.pokeFromReporter(1, ['CVP', 'REP'], powerPokeOpts, { from: bob }))
-        .to.be.revertedWith('PowerPokeStaking::authorizeHDH: Invalid poker key');
+        .to.be.revertedWith('INVALID_POKER_KEY');
     });
 
     it('should deny calling with an empty array', async function() {
@@ -348,8 +350,18 @@ describe('PowerOracle', function () {
 
       await cvpToken.transfer(alice, ether(400), { from: deployer });
       await cvpToken.approve(staking.address, ether(400), { from: alice });
-      await staking.createUser(alice, validReporterPoker, ether(300), { from: alice });
-      await staking.createUser(alice, validSlasherPoker, ether(100), { from: alice });
+      let res = await staking.createUser(alice, validReporterPoker, ether(300), { from: alice });
+      expectEvent(res, 'CreateUser', { userId: '1' });
+      res = await staking.createUser(alice, validSlasherPoker, ether(100), { from: alice });
+      expectEvent(res, 'CreateUser', { userId: '2' });
+
+      await time.increase(DEPOSIT_TIMEOUT);
+
+      await staking.executeDeposit(1, { from: alice });
+      await staking.executeDeposit(2, { from: alice });
+
+      expect(await staking.getHDHID()).to.be.equal('1');
+      await staking.authorizeHDH(1, validReporterPoker);
 
       await time.increase(MAX_REPORT_INTERVAL_INT + 1);
     });
@@ -389,7 +401,7 @@ describe('PowerOracle', function () {
 
       await expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
-        overdueCount: '3'
+        times: '3'
       });
     });
 
@@ -447,7 +459,7 @@ describe('PowerOracle', function () {
 
       await expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
         userId: '2',
-        overdueCount: '2'
+        times: '2'
       });
     });
 
@@ -518,12 +530,12 @@ describe('PowerOracle', function () {
 
     it('should deny another user calling an behalf of slasher', async function() {
       await expect(oracle.pokeFromSlasher(2, ['REP'], powerPokeOpts, { from: alice }))
-        .to.be.revertedWith('PowerPokeStaking::authorizeMember: Invalid poker key');
+        .to.be.revertedWith('INVALID_POKER_KEY');
     });
 
     it('should deny another user calling a slasherUpdate', async function() {
       await expect(oracle.slasherHeartbeat(2, { from: alice }))
-        .to.be.revertedWith('PowerPokeStaking::authorizeMember: Invalid poker key');
+        .to.be.revertedWith('INVALID_POKER_KEY');
     });
 
     it('should deny calling with an empty array', async function() {

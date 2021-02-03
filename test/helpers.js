@@ -196,6 +196,14 @@ function uint(n) {
   return web3.utils.toBN(n).toString();
 }
 
+function toInt(n) {
+  return parseInt(n, 10);
+}
+
+function strSum(a, b) {
+  return String(toInt(a) + toInt(b));
+}
+
 const fixed = num => {
   return (new BigNumber(num).toFixed());
 };
@@ -247,6 +255,8 @@ module.exports = {
   keccak256,
   uint256,
   uint,
+  toInt,
+  strSum,
   fixed,
   forkContractUpgrade,
   deployAndSaveArgs,

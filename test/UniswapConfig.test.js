@@ -108,7 +108,7 @@ describe('UniswapConfig', () => {
     const cfg9 = await contract.getTokenConfig(9);
     const tx9 = await contract.contract.methods.getTokenConfig(9).send({ from: deployer });
     expect(cfg9.underlying.toLowerCase()).to.be.equal(address(10));
-    expect(tx9.gasUsed).to.be.equal(22663);
+    expect(tx9.gasUsed).to.be.equal(23667);
 
     const cfg8 = await contract.getTokenConfig(8);
     const tx8 = await contract.contract.methods.getTokenConfig(8).send({ from: deployer });

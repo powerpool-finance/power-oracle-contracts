@@ -76,7 +76,7 @@
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
     "prettier:sol": "prettier --config .prettierrc --write \"contracts/**/*.sol\"",
     "prettier:list-different": "prettier --config .prettierrc --list-different \"**/*.{js,json,md,sol,ts}\"",
-    "test": "mocha --timeout 20000",
+    "test": "hardhat test --no-compile",
     "test:local": "hardhat test --network local",
     "pairs": "builder pair-details --network mainnet",
     "report:size": "hardhat size-contracts",

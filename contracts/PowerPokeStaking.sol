@@ -21,26 +21,29 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /// @notice The event emitted when an existing user is updated
   event UpdateUser(uint256 indexed userId, address indexed adminKey, address indexed pokerKey);
 
-  /// @notice The event emitted when an existing user is updated
-  event Deposit(uint256 indexed userId, address indexed depositor, uint256 amount, uint256 depositAfter);
-
-  /// @notice The event emitted when a valid admin key withdraws funds deposited for the given user ID
-  event Withdraw(
+  /// @notice The event emitted when the user creates pending deposit
+  event CreateDeposit(
     uint256 indexed userId,
-    address indexed adminKey,
-    address indexed to,
+    address indexed depositor,
+    uint256 pendingTimeout,
     uint256 amount,
+    uint256 pendingDepositAfter
+  );
+
+  /// @notice The event emitted when the user transfers his deposit from pending to the active
+  event ExecuteDeposit(uint256 indexed userId, uint256 pendingTimeout, uint256 amount, uint256 depositAfter);
+
+  /// @notice The event emitted when the user creates pending deposit
+  event CreateWithdrawal(
+    uint256 indexed userId,
+    uint256 pendingTimeout,
+    uint256 amount,
+    uint256 pendingWithdrawalAfter,
     uint256 depositAfter
   );
 
-  /// @notice The event emitted when the owner withdraws the extra CVP amount from the contract
-  event WithdrawExtraCVP(
-    bool indexed sent,
-    address indexed to,
-    uint256 diff,
-    uint256 erc20Balance,
-    uint256 accountedTotalDeposits
-  );
+  /// @notice The event emitted when a valid admin key withdraws funds from
+  event ExecuteWithdrawal(uint256 indexed userId, address indexed to, uint256 pendingTimeout, uint256 amount);
 
   /// @notice The event emitted when the owner sets new slashing percent values, where 1ether == 1%
   event SetSlashingPct(uint256 slasherSlashingRewardPct, uint256 protocolSlashingRewardPct);
@@ -67,16 +70,26 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address adminKey;
     address pokerKey;
     uint256 deposit;
+    uint256 pendingDeposit;
+    uint256 pendingDepositTimeout;
+    uint256 pendingWithdrawal;
+    uint256 pendingWithdrawalTimeout;
   }
 
   /// @notice CVP token address
   IERC20 public immutable CVP_TOKEN;
 
+  /// @notice The deposit timeout in seconds
+  uint256 public immutable DEPOSIT_TIMEOUT;
+
+  /// @notice The withdrawal timeout in seconds
+  uint256 public immutable WITHDRAWAL_TIMEOUT;
+
   /// @notice The reservoir which holds CVP tokens
   address public reservoir;
 
-  /// @notice The PowerOracle contract
-  address public powerPoke;
+  /// @notice The slasher address (PowerPoke)
+  address public slasher;
 
   /// @notice The total amount of all deposits
   uint256 public totalDeposit;
@@ -102,10 +115,18 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /// @dev Last deposit change timestamp by user ID
   mapping(uint256 => uint256) internal _lastDepositChange;
 
-  constructor(address cvpToken_) public {
+  constructor(
+    address cvpToken_,
+    uint256 depositTimeout_,
+    uint256 withdrawTimeout_
+  ) public {
     require(cvpToken_ != address(0), "CVP_ADDR_IS_0");
+    require(depositTimeout_ > 0, "DEPOSIT_TIMEOUT_IS_0");
+    require(withdrawTimeout_ > 0, "WITHDRAW_TIMEOUT_IS_0");
 
     CVP_TOKEN = IERC20(cvpToken_);
+    DEPOSIT_TIMEOUT = depositTimeout_;
+    WITHDRAWAL_TIMEOUT = withdrawTimeout_;
   }
 
   function initialize(
@@ -117,7 +138,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   ) public initializer {
     _transferOwnership(owner_);
     reservoir = reservoir_;
-    powerPoke = slasher_;
+    slasher = slasher_;
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = reservoirSlashingRewardPct_;
   }
@@ -129,26 +150,53 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
    * @param userId_ The user ID to make deposit for
    * @param amount_ The amount in CVP tokens to deposit
    */
-  function deposit(uint256 userId_, uint256 amount_) external override whenNotPaused {
-    require(amount_ > 0, "PowerPokeStaking::deposit: Missing amount");
-    require(users[userId_].adminKey != address(0), "PowerPokeStaking::deposit: Admin key can't be empty");
+  function createDeposit(uint256 userId_, uint256 amount_) external override whenNotPaused {
+    require(amount_ > 0, "MISSING_AMOUNT");
 
-    _deposit(userId_, amount_);
-  }
-
-  function _deposit(uint256 userId_, uint256 amount_) internal {
     User storage user = users[userId_];
 
-    uint256 depositAfter = user.deposit.add(amount_);
+    require(user.adminKey != address(0), "INVALID_USER");
+
+    _createDeposit(userId_, amount_);
+  }
+
+  function _createDeposit(uint256 userId_, uint256 amount_) internal {
+    User storage user = users[userId_];
+
+    uint256 pendingDepositAfter = user.pendingDeposit.add(amount_);
+    uint256 timeout = block.timestamp.add(DEPOSIT_TIMEOUT);
+
+    user.pendingDeposit = pendingDepositAfter;
+    user.pendingDepositTimeout = timeout;
+
+    emit CreateDeposit(userId_, msg.sender, timeout, amount_, pendingDepositAfter);
+    CVP_TOKEN.transferFrom(msg.sender, address(this), amount_);
+  }
+
+  function executeDeposit(uint256 userId_) external override {
+    User storage user = users[userId_];
+    uint256 amount = user.pendingDeposit;
+    uint256 pendingDepositTimeout = user.pendingDepositTimeout;
+
+    // check
+    require(user.adminKey == msg.sender, "ONLY_ADMIN_ALLOWED");
+    require(amount > 0, "NO_PENDING_DEPOSIT");
+    require(block.timestamp >= pendingDepositTimeout, "TIMEOUT_NOT_PASSED");
+
+    // increment deposit
+    uint256 depositAfter = user.deposit.add(amount);
     user.deposit = depositAfter;
-    totalDeposit = totalDeposit.add(amount_);
+    totalDeposit = totalDeposit.add(amount);
+
+    // reset pending deposit
+    user.pendingDeposit = 0;
+    user.pendingDepositTimeout = 0;
 
     _lastDepositChange[userId_] = block.timestamp;
 
     _trySetHighestDepositHolder(userId_, depositAfter);
 
-    emit Deposit(userId_, msg.sender, amount_, depositAfter);
-    CVP_TOKEN.transferFrom(msg.sender, address(this), amount_);
+    emit ExecuteDeposit(userId_, pendingDepositTimeout, amount, depositAfter);
   }
 
   function _trySetHighestDepositHolder(uint256 candidateId_, uint256 candidateDepositAfter_) internal {
@@ -166,31 +214,50 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /**
    * @notice A valid users admin key withdraws the deposited stake form the contract
    * @param userId_ The user ID to withdraw deposit from
-   * @param to_ The address to send the CVP tokens to
    * @param amount_ The amount in CVP tokens to withdraw
    */
-  function withdraw(
-    uint256 userId_,
-    address to_,
-    uint256 amount_
-  ) external override {
-    require(amount_ > 0, "PowerPokeStaking::withdraw: Missing amount");
-    require(to_ != address(0), "PowerPokeStaking::withdraw: Can't transfer to 0 address");
+  function createWithdrawal(uint256 userId_, uint256 amount_) external override {
+    require(amount_ > 0, "MISSING_AMOUNT");
 
     User storage user = users[userId_];
-    require(msg.sender == user.adminKey, "PowerPokeStaking::withdraw: Only user's admin key allowed");
+    require(msg.sender == user.adminKey, "ONLY_ADMIN_ALLOWED");
 
+    // decrement deposit
     uint256 depositBefore = user.deposit;
-    require(amount_ <= depositBefore, "PowerPokeStaking::withdraw: Amount exceeds deposit");
+    require(amount_ <= depositBefore, "AMOUNT_EXCEEDS_DEPOSIT");
 
     uint256 depositAfter = depositBefore - amount_;
-    users[userId_].deposit = depositAfter;
+    user.deposit = depositAfter;
     totalDeposit = totalDeposit.sub(amount_);
+
+    // increment pending withdrawal
+    uint256 pendingWithdrawalAfter = user.pendingWithdrawal.add(amount_);
+    uint256 timeout = block.timestamp.add(WITHDRAWAL_TIMEOUT);
+    user.pendingWithdrawal = pendingWithdrawalAfter;
+    user.pendingWithdrawalTimeout = timeout;
 
     _lastDepositChange[userId_] = block.timestamp;
 
-    emit Withdraw(userId_, msg.sender, to_, amount_, depositAfter);
-    CVP_TOKEN.transfer(to_, amount_);
+    emit CreateWithdrawal(userId_, timeout, amount_, pendingWithdrawalAfter, depositAfter);
+  }
+
+  function executeWithdrawal(uint256 userId_, address to_) external override {
+    require(to_ != address(0), "CANT_WITHDRAW_TO_0");
+
+    User storage user = users[userId_];
+
+    uint256 pendingWithdrawalTimeout = user.pendingWithdrawalTimeout;
+    uint256 amount = user.pendingWithdrawal;
+
+    require(msg.sender == user.adminKey, "ONLY_ADMIN_ALLOWED");
+    require(amount > 0, "NO_PENDING_WITHDRAWAL");
+    require(block.timestamp >= pendingWithdrawalTimeout, "TIMEOUT_NOT_PASSED");
+
+    user.pendingWithdrawal = 0;
+    user.pendingWithdrawalTimeout = 0;
+
+    emit ExecuteWithdrawal(userId_, to_, pendingWithdrawalTimeout, amount);
+    CVP_TOKEN.transfer(to_, amount);
   }
 
   /**
@@ -206,12 +273,12 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   ) external override whenNotPaused {
     uint256 userId = ++userIdCounter;
 
-    users[userId] = User(adminKey_, pokerKey_, 0);
+    users[userId] = User(adminKey_, pokerKey_, 0, 0, 0, 0, 0);
 
     emit CreateUser(userId, adminKey_, pokerKey_, initialDeposit_);
 
     if (initialDeposit_ > 0) {
-      _deposit(userId, initialDeposit_);
+      _createDeposit(userId, initialDeposit_);
     }
   }
 
@@ -226,7 +293,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_
   ) external override {
     User storage user = users[userId_];
-    require(msg.sender == user.adminKey, "PowerPokeStaking::updateUser: Only admin allowed");
+    require(msg.sender == user.adminKey, "ONLY_ADMIN_ALLOWED");
 
     if (adminKey_ != user.adminKey) {
       user.adminKey = adminKey_;
@@ -243,22 +310,27 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /**
    * @notice Slashes the current reporter if it did not make poke() call during the given report interval
    * @param slasherId_ The slasher ID
-   * @param amount_ The amount in CVP to slash
+   * @param times_ The multiplier for a single slashing percent
    */
-  function slashHDH(uint256 slasherId_, uint256 amount_) external virtual override {
-    require(msg.sender == powerPoke, "ONLY_POWER_POKE_ALLOWED");
+  function slashHDH(uint256 slasherId_, uint256 times_) external virtual override {
+    require(msg.sender == slasher, "ONLY_SLASHER_ALLOWED");
 
     uint256 hdhId = _hdhId;
     uint256 hdhDeposit = users[hdhId].deposit;
-    require(hdhDeposit >= amount_, "INSUFFICIENT_SLASHEE_DEPOSIT");
 
-    uint256 slasherReward = amount_.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
-    uint256 reservoirReward = amount_.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
+    uint256 product = times_.mul(hdhDeposit);
+    // uint256 slasherReward = times_ * reporterDeposit * slasherRewardPct / HUNDRED_PCT;
+    uint256 slasherReward = product.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
+    // uint256 reservoirReward = times_ * reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
+    uint256 reservoirReward = product.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
+
+    uint256 amount = slasherReward.add(reservoirReward);
+    require(hdhDeposit >= amount, "INSUFFICIENT_HDH_DEPOSIT");
 
     // users[reporterId].deposit = reporterDeposit - slasherReward - reservoirReward;
-    users[hdhId].deposit = hdhDeposit.sub(slasherReward).sub(reservoirReward);
+    users[hdhId].deposit = hdhDeposit.sub(amount);
 
-    // totalDeposit = totalDeposit - reservoirReward;
+    // totalDeposit = totalDeposit - reservoirReward; (slasherReward is kept on the contract)
     totalDeposit = totalDeposit.sub(reservoirReward);
 
     emit Slash(slasherId_, hdhId, slasherReward, reservoirReward);
@@ -278,33 +350,11 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /*** OWNER INTERFACE ***/
 
   /**
-   * @notice The owner withdraws the surplus of CVP tokens
-   * @param to_ The address to transfer the surplus
-   */
-  function withdrawExtraCVP(address to_) external override onlyOwner {
-    require(to_ != address(0), "PowerPokeStaking::withdrawExtraCVP: Cant withdraw to 0 address");
-
-    uint256 erc20Balance = CVP_TOKEN.balanceOf(address(this));
-    uint256 totalBalance = totalDeposit;
-    bool sent = false;
-    uint256 diff;
-
-    if (erc20Balance > totalBalance) {
-      diff = erc20Balance - totalBalance;
-
-      CVP_TOKEN.transfer(to_, diff);
-      sent = true;
-    }
-
-    emit WithdrawExtraCVP(sent, to_, diff, erc20Balance, totalBalance);
-  }
-
-  /**
    * @notice The owner sets a new slasher address
    * @param slasher_ The slasher address to set
    */
   function setSlasher(address slasher_) external override onlyOwner {
-    powerPoke = slasher_;
+    slasher = slasher_;
     emit SetSlasher(slasher_);
   }
 
@@ -318,10 +368,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     override
     onlyOwner
   {
-    require(
-      slasherSlashingRewardPct_.add(protocolSlashingRewardPct_) <= HUNDRED_PCT,
-      "PowerPokeStaking::setSlashingPct: Invalid reward sum"
-    );
+    require(slasherSlashingRewardPct_.add(protocolSlashingRewardPct_) <= HUNDRED_PCT, "INVALID_SUM");
 
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = protocolSlashingRewardPct_;
@@ -353,7 +400,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     uint256 prevHdhId = _hdhId;
     uint256 currentReporterDeposit = users[prevHdhId].deposit;
 
-    require(candidateDeposit > currentReporterDeposit, "PowerPokeStaking::setReporter: Insufficient candidate deposit");
+    require(candidateDeposit > currentReporterDeposit, "INSUFFICIENT_CANDIDATE_DEPOSIT");
 
     emit ReporterChange(prevHdhId, candidateId_, _highestDeposit, currentReporterDeposit, candidateDeposit);
     emit SetReporter(candidateId_, msg.sender);
@@ -376,6 +423,14 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     return users[userId_].deposit;
   }
 
+  function getPendingDepositOf(uint256 userId_) external view override returns (uint256 balance, uint256 timeout) {
+    return (users[userId_].pendingDeposit, users[userId_].pendingDepositTimeout);
+  }
+
+  function getPendingWithdrawalOf(uint256 userId_) external view override returns (uint256 balance, uint256 timeout) {
+    return (users[userId_].pendingWithdrawal, users[userId_].pendingWithdrawalTimeout);
+  }
+
   function getUserStatus(
     uint256 userId_,
     address pokerKey_,
@@ -391,8 +446,8 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   }
 
   function authorizeHDH(uint256 userId_, address pokerKey_) external view override {
-    require(userId_ == _hdhId, "PowerPokeStaking::authorizeHdh: Not the HDH");
-    require(users[userId_].pokerKey == pokerKey_, "PowerPokeStaking::authorizeHDH: Invalid poker key");
+    require(userId_ == _hdhId, "NOT_HDH");
+    require(users[userId_].pokerKey == pokerKey_, "INVALID_POKER_KEY");
   }
 
   function authorizeNonHDH(
@@ -400,7 +455,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_,
     uint256 minDeposit_
   ) external view override {
-    require(userId_ != _hdhId, "PowerPokeStaking::authorizeNonHDH: Is HDH");
+    require(userId_ != _hdhId, "IS_HDH");
     authorizeMember(userId_, pokerKey_, minDeposit_);
   }
 
@@ -409,12 +464,12 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address pokerKey_,
     uint256 minDeposit_
   ) public view override {
-    require(users[userId_].deposit >= minDeposit_, "PowerPokeStaking::authorizeMember: Insufficient deposit");
-    require(users[userId_].pokerKey == pokerKey_, "PowerPokeStaking::authorizeMember: Invalid poker key");
+    require(users[userId_].deposit >= minDeposit_, "INSUFFICIENT_DEPOSIT");
+    require(users[userId_].pokerKey == pokerKey_, "INVALID_POKER_KEY");
   }
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
-    require(users[userId_].adminKey == adminKey_, "PowerPokeStaking::requireValidAdminKey: Invalid admin key");
+    require(users[userId_].adminKey == adminKey_, "INVALID_AMIN_KEY");
   }
 
   function getLastDepositChange(uint256 userId_) external view override returns (uint256) {

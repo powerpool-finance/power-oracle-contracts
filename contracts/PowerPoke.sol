@@ -178,14 +178,14 @@ contract PowerPoke is Ownable, Initializable, ReentrancyGuard {
     POWER_POKE_STAKING.authorizeMember(userId_, pokerKey_, overrideMinStake_);
   }
 
-  function slashReporter(uint256 userId_, uint256 amount_) external nonReentrant {
+  function slashReporter(uint256 userId_, uint256 times_) external nonReentrant {
     require(clients[msg.sender].active, "INVALID_CLIENT");
     require(clients[msg.sender].canSlash, "CANT_SLASH");
-    if (amount_ == 0) {
+    if (times_ == 0) {
       return;
     }
 
-    POWER_POKE_STAKING.slashHDH(userId_, amount_);
+    POWER_POKE_STAKING.slashHDH(userId_, times_);
   }
 
   function reward(
