@@ -58,6 +58,14 @@ const config = {
       gas: gasLimit,
       blockGasLimit: gasLimit
     },
+    kovan: {
+      url: 'https://kovan-eth.compound.finance',
+      gasPrice: 10 ** 9,
+      gasMultiplier: 1.5,
+      accounts: getAccounts('kovan'),
+      gas: gasLimit,
+      blockGasLimit: gasLimit
+    },
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       // accounts: getAccounts('mainnet'),
@@ -87,8 +95,8 @@ const config = {
     /* https://buidler.dev/buidler-evm/#solidity-optimizer-support */
     settings: {
       optimizer: {
-        enabled: false,
-        runs: 0,
+        enabled: true,
+        runs: 1,
       }
     },
     version: '0.6.12'
