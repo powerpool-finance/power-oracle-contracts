@@ -65,7 +65,7 @@ describe('PowerPoke', function () {
     });
     powerPokeOptsETH = web3.eth.abi.encodeParameter(powerPokeOptsStruct, {
       to: alice,
-      compensateInETH: false,
+      compensateInETH: true,
     });
   });
 
