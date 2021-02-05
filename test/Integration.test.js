@@ -74,8 +74,8 @@ describe('IntegrationTest', function () {
   it('should allow stake, poke and slash', async function() {
     staking = await deployProxied(
       PowerPokeStaking,
-      [cvpToken.address, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
-      [owner, reservoir, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
+      [cvpToken.address],
+      [owner, reservoir, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
       { proxyAdminOwner: owner }
       );
 
@@ -100,7 +100,7 @@ describe('IntegrationTest', function () {
     await cvpToken.transfer(alice, ether(100000), { from: deployer });
     await cvpToken.approve(poke.address, ether(30000), { from: alice })
     await poke.addCredit(oracle.address, ether(30000), { from: alice });
-    await poke.setCompensationPlan(oracle.address, 1,  25, 17520000, 100 * 1000, { from: oracleClientOwner });
+    await poke.setBonusPlan(oracle.address, 1,  true, 25, 17520000, 100 * 1000, { from: oracleClientOwner });
 
     expect(await staking.CVP_TOKEN()).to.be.equal(cvpToken.address);
 
@@ -195,7 +195,7 @@ describe('IntegrationTest', function () {
 
     await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
       userId: '1',
-      compensationPlan: '1',
+      bonusPlan: '1',
     })
 
     // 4th Poke from Slasher which fails

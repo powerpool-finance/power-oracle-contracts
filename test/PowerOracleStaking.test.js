@@ -38,8 +38,8 @@ describe('PowerPokeStaking', function () {
     cvpToken = await MockCVP.new(ether(1e9));
     staking = await deployProxied(
       StubStaking,
-      [cvpToken.address, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
-      [owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT],
+      [cvpToken.address],
+      [owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
       { proxyAdminOwner: owner }
     );
   });
@@ -50,14 +50,14 @@ describe('PowerPokeStaking', function () {
       expect(await staking.owner()).to.be.equal(owner);
       expect(await staking.reservoir()).to.be.equal(reservoir);
       expect(await staking.slasher()).to.be.equal(powerOracle);
-      expect(await staking.DEPOSIT_TIMEOUT()).to.be.equal(DEPOSIT_TIMEOUT);
-      expect(await staking.WITHDRAWAL_TIMEOUT()).to.be.equal(WITHDRAWAL_TIMEOUT);
+      expect(await staking.depositTimeout()).to.be.equal(DEPOSIT_TIMEOUT);
+      expect(await staking.withdrawalTimeout()).to.be.equal(WITHDRAWAL_TIMEOUT);
       expect(await staking.slasherSlashingRewardPct()).to.be.equal(SLASHER_SLASHING_REWARD_PCT);
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
     });
 
     it('should deny initializing again', async function() {
-      await expect(staking.initialize(owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT))
+      await expect(staking.initialize(owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })

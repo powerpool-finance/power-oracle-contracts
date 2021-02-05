@@ -71,7 +71,7 @@ describe('PowerPoke', function () {
 
   beforeEach(async function () {
     cvpToken = await MockCVP.new(ether(1000000));
-    staking = await MockStaking.new(cvpToken.address, 30, 30);
+    staking = await MockStaking.new(cvpToken.address);
     oracle = await StubOracle.new(cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address));
     poke = await MockPoke.new(cvpToken.address, WETH, fastGasOracle.address, uniswapRouter.address, staking.address);
     await poke.initialize(owner, oracle.address);

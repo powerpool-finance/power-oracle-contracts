@@ -80,10 +80,10 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   IERC20 public immutable CVP_TOKEN;
 
   /// @notice The deposit timeout in seconds
-  uint256 public immutable DEPOSIT_TIMEOUT;
+  uint256 public depositTimeout;
 
   /// @notice The withdrawal timeout in seconds
-  uint256 public immutable WITHDRAWAL_TIMEOUT;
+  uint256 public withdrawalTimeout;
 
   /// @notice The reservoir which holds CVP tokens
   address public reservoir;
@@ -115,20 +115,10 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
   /// @dev Last deposit change timestamp by user ID
   mapping(uint256 => uint256) internal _lastDepositChange;
 
-  constructor(
-    address cvpToken_,
-    // TODO: move to initializer
-    uint256 depositTimeout_,
-    // TODO: move to initializer
-    uint256 withdrawTimeout_
-  ) public {
+  constructor(address cvpToken_) public {
     require(cvpToken_ != address(0), "CVP_ADDR_IS_0");
-    require(depositTimeout_ > 0, "DEPOSIT_TIMEOUT_IS_0");
-    require(withdrawTimeout_ > 0, "WITHDRAW_TIMEOUT_IS_0");
 
     CVP_TOKEN = IERC20(cvpToken_);
-    DEPOSIT_TIMEOUT = depositTimeout_;
-    WITHDRAWAL_TIMEOUT = withdrawTimeout_;
   }
 
   function initialize(
@@ -136,13 +126,20 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     address reservoir_,
     address slasher_,
     uint256 slasherSlashingRewardPct_,
-    uint256 reservoirSlashingRewardPct_
+    uint256 reservoirSlashingRewardPct_,
+    uint256 depositTimeout_,
+    uint256 withdrawTimeout_
   ) public initializer {
+    require(depositTimeout_ > 0, "DEPOSIT_TIMEOUT_IS_0");
+    require(withdrawTimeout_ > 0, "WITHDRAW_TIMEOUT_IS_0");
+
     _transferOwnership(owner_);
     reservoir = reservoir_;
     slasher = slasher_;
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = reservoirSlashingRewardPct_;
+    depositTimeout = depositTimeout_;
+    withdrawalTimeout = withdrawTimeout_;
   }
 
   /*** User Interface ***/
@@ -166,7 +163,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     User storage user = users[userId_];
 
     uint256 pendingDepositAfter = user.pendingDeposit.add(amount_);
-    uint256 timeout = block.timestamp.add(DEPOSIT_TIMEOUT);
+    uint256 timeout = block.timestamp.add(depositTimeout);
 
     user.pendingDeposit = pendingDepositAfter;
     user.pendingDepositTimeout = timeout;
@@ -234,7 +231,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
     // increment pending withdrawal
     uint256 pendingWithdrawalAfter = user.pendingWithdrawal.add(amount_);
-    uint256 timeout = block.timestamp.add(WITHDRAWAL_TIMEOUT);
+    uint256 timeout = block.timestamp.add(withdrawalTimeout);
     user.pendingWithdrawal = pendingWithdrawalAfter;
     user.pendingWithdrawalTimeout = timeout;
 
