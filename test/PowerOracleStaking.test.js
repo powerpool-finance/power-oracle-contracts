@@ -612,6 +612,33 @@ describe('PowerPokeStaking', function () {
       })
     });
 
+    it('should work correctly with 0 slasher/reservoir rewardPct values', async function() {
+      await staking.setSlashingPct(ether(0), ether(0), { from: owner });
+      expect(await staking.slasherSlashingRewardPct()).to.be.equal(ether(0));
+      expect(await staking.protocolSlashingRewardPct()).to.be.equal(ether(0));
+
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal('0');
+      expect(await staking.totalDeposit()).to.be.equal(ether(560));
+      expect(await staking.slasherSlashingRewardPct()).to.be.equal(ether(0));
+      expect(await staking.protocolSlashingRewardPct()).to.be.equal(ether(0));
+
+      const res = await staking.slashHDH(SLASHER_ID, 4, { from: powerPoke });
+      expectEvent(res, 'Slash', {
+        slasherId: SLASHER_ID,
+        reporterId: REPORTER_ID,
+        slasherReward: ether(0),
+        reservoirReward: ether(0)
+      })
+
+      expect(await staking.totalDeposit()).to.be.equal(ether(560));
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal(ether(0));
+      expect(await staking.getHDHID()).to.be.equal(REPORTER_ID);
+    });
+
     it('should deny slashing if the slasher deposit is not sufficient', async function() {
       await staking.stubSetUser(SLASHER_ID, bob, bobPoker, ether(40), { from: bob });
       await expect(staking.slashHDH(SLASHER_ID, 100, { from: powerPoke }))
