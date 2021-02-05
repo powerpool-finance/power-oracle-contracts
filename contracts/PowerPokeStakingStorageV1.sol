@@ -48,4 +48,7 @@ contract PowerPokeStakingStorageV1 {
 
   /// @dev Last deposit change timestamp by user ID
   mapping(uint256 => uint256) internal _lastDepositChange;
+
+  // Reserved storage space to allow for layout changes in the future.
+  uint256[50] private ______gap;
 }
