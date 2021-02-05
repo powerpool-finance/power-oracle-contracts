@@ -18,5 +18,5 @@ module.exports = {
     shell.rm('-rf', './artifacts');
     shell.rm('-rf', './typechain');
   },
-  skipFiles: ['mocks', 'test'],
+  skipFiles: ['mocks', 'test', 'InstantUniswapPrice.sol'],
 };
