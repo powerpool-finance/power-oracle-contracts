@@ -83,7 +83,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     uint256 reservoirSlashingRewardPct_,
     uint256 depositTimeout_,
     uint256 withdrawTimeout_
-  ) internal initializer {
+  ) external initializer {
     require(depositTimeout_ > 0, "DEPOSIT_TIMEOUT_IS_0");
     require(withdrawTimeout_ > 0, "WITHDRAW_TIMEOUT_IS_0");
 
