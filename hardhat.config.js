@@ -3,6 +3,7 @@ require('@nomiclabs/hardhat-etherscan');
 require('solidity-coverage');
 require('hardhat-contract-sizer');
 require('hardhat-gas-reporter');
+require('hardhat-typechain');
 
 require('./tasks/fetchPairValues')
 require('./tasks/deployTestnet')
@@ -42,9 +43,6 @@ const config = {
     timeout: 20000
   },
   networks: {
-    // buidlerevm: {
-    //   chainId: 31337,
-    // },
     hardhat: {
       gas: gasLimit,
       blockGasLimit: gasLimit,
@@ -104,6 +102,7 @@ const config = {
   typechain: {
     outDir: 'typechain',
     target: 'ethers-v5',
+    runOnCompile: false
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_KEY

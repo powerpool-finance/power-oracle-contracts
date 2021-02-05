@@ -38,8 +38,8 @@ describe('PowerPokeStaking', function () {
     cvpToken = await MockCVP.new(ether(1e9));
     staking = await deployProxied(
       StubStaking,
-      [cvpToken.address, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
-      [owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT],
+      [cvpToken.address],
+      [owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT],
       { proxyAdminOwner: owner }
     );
   });
@@ -50,14 +50,14 @@ describe('PowerPokeStaking', function () {
       expect(await staking.owner()).to.be.equal(owner);
       expect(await staking.reservoir()).to.be.equal(reservoir);
       expect(await staking.slasher()).to.be.equal(powerOracle);
-      expect(await staking.DEPOSIT_TIMEOUT()).to.be.equal(DEPOSIT_TIMEOUT);
-      expect(await staking.WITHDRAWAL_TIMEOUT()).to.be.equal(WITHDRAWAL_TIMEOUT);
+      expect(await staking.depositTimeout()).to.be.equal(DEPOSIT_TIMEOUT);
+      expect(await staking.withdrawalTimeout()).to.be.equal(WITHDRAWAL_TIMEOUT);
       expect(await staking.slasherSlashingRewardPct()).to.be.equal(SLASHER_SLASHING_REWARD_PCT);
       expect(await staking.protocolSlashingRewardPct()).to.be.equal(PROTOCOL_SLASHING_REWARD_PCT);
     });
 
     it('should deny initializing again', async function() {
-      await expect(staking.initialize(owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT))
+      await expect(staking.initialize(owner, reservoir, powerOracle, SLASHER_SLASHING_REWARD_PCT, PROTOCOL_SLASHING_REWARD_PCT, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT))
         .to.be.revertedWith('Contract instance has already been initialized')
     });
   })
@@ -610,6 +610,33 @@ describe('PowerPokeStaking', function () {
         actualDepositPrev: ether('202.612'),
         actualDepositNext: ether('288.76')
       })
+    });
+
+    it('should work correctly with 0 slasher/reservoir rewardPct values', async function() {
+      await staking.setSlashingPct(ether(0), ether(0), { from: owner });
+      expect(await staking.slasherSlashingRewardPct()).to.be.equal(ether(0));
+      expect(await staking.protocolSlashingRewardPct()).to.be.equal(ether(0));
+
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal('0');
+      expect(await staking.totalDeposit()).to.be.equal(ether(560));
+      expect(await staking.slasherSlashingRewardPct()).to.be.equal(ether(0));
+      expect(await staking.protocolSlashingRewardPct()).to.be.equal(ether(0));
+
+      const res = await staking.slashHDH(SLASHER_ID, 4, { from: powerPoke });
+      expectEvent(res, 'Slash', {
+        slasherId: SLASHER_ID,
+        reporterId: REPORTER_ID,
+        slasherReward: ether(0),
+        reservoirReward: ether(0)
+      })
+
+      expect(await staking.totalDeposit()).to.be.equal(ether(560));
+      expect(await staking.getDepositOf(REPORTER_ID)).to.be.equal(ether(500));
+      expect(await staking.getDepositOf(SLASHER_ID)).to.be.equal(ether(60));
+      expect(await cvpToken.balanceOf(reservoir)).to.be.equal(ether(0));
+      expect(await staking.getHDHID()).to.be.equal(REPORTER_ID);
     });
 
     it('should deny slashing if the slasher deposit is not sufficient', async function() {

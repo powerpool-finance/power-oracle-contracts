@@ -5,11 +5,7 @@ pragma solidity ^0.6.0;
 import "../PowerPokeStaking.sol";
 
 contract StubStaking is PowerPokeStaking {
-  constructor(
-    address cvpToken_,
-    uint256 depositTimeout_,
-    uint256 withdrawTimeout_
-  ) public PowerPokeStaking(cvpToken_, depositTimeout_, withdrawTimeout_) {}
+  constructor(address cvpToken_) public PowerPokeStaking(cvpToken_) {}
 
   function stubSetTotalDeposit(uint256 totalDeposit_) external {
     totalDeposit = totalDeposit_;

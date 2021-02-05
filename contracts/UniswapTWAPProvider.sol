@@ -4,10 +4,11 @@ pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./PowerOracleStorageV1.sol";
 import "./Uniswap/UniswapConfig.sol";
 import "./Uniswap/UniswapLib.sol";
 
-abstract contract UniswapTWAPProvider is UniswapConfig {
+abstract contract UniswapTWAPProvider is PowerOracleStorageV1, UniswapConfig {
   using FixedPoint for *;
   using SafeMath for uint256;
 
@@ -27,19 +28,8 @@ abstract contract UniswapTWAPProvider is UniswapConfig {
   /// @notice The event emitted when the uniswap window changes
   event UniswapWindowUpdated(bytes32 indexed symbolHash, uint oldTimestamp, uint newTimestamp, uint oldPrice, uint newPrice);
 
-  struct Observation {
-    uint timestamp;
-    uint acc;
-  }
-
   /// @notice The minimum amount of time in seconds required for the old uniswap price accumulator to be replaced
   uint public immutable anchorPeriod;
-
-  /// @notice The old observation for each symbolHash
-  mapping(bytes32 => Observation) public oldObservations;
-
-  /// @notice The new observation for each symbolHash
-  mapping(bytes32 => Observation) public newObservations;
 
   constructor(
     uint anchorPeriod_,

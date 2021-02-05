@@ -28,7 +28,6 @@ const MAX_REPORT_INTERVAL = '90';
 const MAX_REPORT_INTERVAL_INT = 90;
 const SLASHER_HEARTBEAT_INTERVAL = 120;
 const DEPOSIT_TIMEOUT = '30';
-const WITHDRAWAL_TIMEOUT = '180';
 const WETH = address(111);
 
 function expectPriceUpdateEvent(config) {
@@ -91,8 +90,8 @@ describe('PowerOracle', function () {
   });
 
   beforeEach(async function() {
-    cvpToken = await MockCVP.new(ether(1000000));
-    staking = await MockStaking.new(cvpToken.address, DEPOSIT_TIMEOUT, WITHDRAWAL_TIMEOUT);
+    cvpToken = await MockCVP.new(ether(100000000));
+    staking = await MockStaking.new(cvpToken.address);
 
     // poke = await PowerPoke.new(cvpToken.address, WETH, fastGasOracle.address, uniswapRouter, staking.address);
     poke = await deployProxied(
@@ -110,7 +109,7 @@ describe('PowerOracle', function () {
 
     await poke.setOracle(oracle.address, { from: owner });
     await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
-    await cvpToken.transfer(alice, ether(100000), { from: deployer });
+    await cvpToken.transfer(alice, ether(10000000), { from: deployer });
     await cvpToken.approve(oracle.address, ether(100000), { from: reservoir });
   });
 
@@ -137,7 +136,7 @@ describe('PowerOracle', function () {
       await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
       await cvpToken.approve(poke.address, ether(30000), { from: alice })
       await poke.addCredit(oracle.address, ether(30000), { from: alice });
-      await poke.setCompensationPlan(oracle.address, 1,  25, 17520000, 100 * 1000, { from: oracleClientOwner });
+      await poke.setBonusPlan(oracle.address, 1,  true, 25, 17520000, 100 * 1000, { from: oracleClientOwner });
     });
 
     it('should allow a valid reporter calling the method', async function() {
@@ -181,9 +180,9 @@ describe('PowerOracle', function () {
         await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
         await poke.setOracle(oracle.address, { from: owner });
 
-        await cvpToken.approve(poke.address, ether(30000), { from: alice })
-        await poke.addCredit(oracle.address, ether(30000), { from: alice });
-        await poke.setCompensationPlan(oracle.address, 1,  25, 17520000, 100 * 1000, { from: oracleClientOwner });
+        await cvpToken.approve(poke.address, ether(3000000), { from: alice })
+        await poke.addCredit(oracle.address, ether(3000000), { from: alice });
+        await poke.setBonusPlan(oracle.address, 1,  true, 25, 17520000, 100 * 1000, { from: oracleClientOwner });
 
         await oracle.mockSetAnchorPrice('ETH', mwei('320'));
         await oracle.mockSetAnchorPrice('CVP', mwei('5'));
@@ -220,7 +219,7 @@ describe('PowerOracle', function () {
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           userId: '1',
           userDeposit: kether(270),
-          bonusCVP: ether('1.155821917808219178')
+          // bonusCVP: ether('1.155821917808219178')
           // calculatedReward: ether('1.6928')
         });
       });
@@ -274,7 +273,7 @@ describe('PowerOracle', function () {
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           userId: '1',
           userDeposit: kether(270),
-          bonusCVP: ether('1.541095890410958904')
+          // bonusCVP: ether('1.541095890410958904')
           // calculatedReward: ether('2.5392')
         });
       });
@@ -317,7 +316,7 @@ describe('PowerOracle', function () {
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           client: oracle.address,
           userId: '1',
-          rewardInETH: false,
+          compensateInETH: false,
           // gasUsed: '306480',
           gasPrice: gwei(35),
           userDeposit: kether(270),
@@ -344,9 +343,9 @@ describe('PowerOracle', function () {
 
       await cvpToken.approve(poke.address, ether(30000), { from: alice })
       await poke.addCredit(oracle.address, ether(30000), { from: alice });
-      await poke.setCompensationPlan(oracle.address, 1,  25, 17520000, 100 * 1000, { from: oracleClientOwner });
-      await poke.setCompensationPlan(oracle.address, 2,  2, 17520000, 10 * 1000, { from: oracleClientOwner });
-      await poke.setSlasherHearbeat(oracle.address, SLASHER_HEARTBEAT_INTERVAL, { from: oracleClientOwner });
+      await poke.setBonusPlan(oracle.address, 1,  true, 25, 17520000, 100 * 1000, { from: oracleClientOwner });
+      await poke.setBonusPlan(oracle.address, 2,  true, 2, 17520000, 10 * 1000, { from: oracleClientOwner });
+      await poke.setSlasherHeartbeat(oracle.address, SLASHER_HEARTBEAT_INTERVAL, { from: oracleClientOwner });
 
       await cvpToken.transfer(alice, ether(400), { from: deployer });
       await cvpToken.approve(staking.address, ether(400), { from: alice });
@@ -383,8 +382,8 @@ describe('PowerOracle', function () {
       await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
         client: oracle.address,
         userId: '2',
-        compensationPlan: '1',
-        rewardInETH: false,
+        bonusPlan: '1',
+        compensateInETH: false,
         // gasUsed: '306480',
         gasPrice: gwei(35),
         userDeposit: ether(100),
@@ -400,7 +399,7 @@ describe('PowerOracle', function () {
       })
 
       await expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
-        userId: '2',
+        slasherId: '2',
         times: '3'
       });
     });
@@ -441,8 +440,8 @@ describe('PowerOracle', function () {
       await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
         client: oracle.address,
         userId: '2',
-        compensationPlan: '1',
-        rewardInETH: false,
+        bonusPlan: '1',
+        compensateInETH: false,
         // gasUsed: '306480',
         gasPrice: gwei(35),
         userDeposit: ether(100),
@@ -458,7 +457,7 @@ describe('PowerOracle', function () {
       });
 
       await expectEvent.inTransaction(res.tx, MockStaking, 'MockSlash', {
-        userId: '2',
+        slasherId: '2',
         times: '2'
       });
     });
@@ -568,9 +567,9 @@ describe('PowerOracle', function () {
 
       await cvpToken.approve(poke.address, ether(30000), { from: alice })
       await poke.addCredit(oracle.address, ether(30000), { from: alice });
-      await poke.setCompensationPlan(oracle.address, 1,  25, 17520000, 100 * 1000, { from: oracleClientOwner });
-      await poke.setCompensationPlan(oracle.address, 2,  2, 17520000, 10 * 1000, { from: oracleClientOwner });
-      await poke.setSlasherHearbeat(oracle.address, SLASHER_HEARTBEAT_INTERVAL, { from: oracleClientOwner });
+      await poke.setBonusPlan(oracle.address, 1,  true, 25, 17520000, 100 * 1000, { from: oracleClientOwner });
+      await poke.setBonusPlan(oracle.address, 2,  true, 2, 17520000, 10 * 1000, { from: oracleClientOwner });
+      await poke.setSlasherHeartbeat(oracle.address, SLASHER_HEARTBEAT_INTERVAL, { from: oracleClientOwner });
 
       let res = await oracle.poke(['REP', 'DAI', 'BTC'], { from: alice });
       const firstTimestamp = await getResTimestamp(res);

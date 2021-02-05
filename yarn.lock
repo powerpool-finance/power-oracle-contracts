@@ -4990,6 +4990,11 @@ hardhat-gas-reporter@^1.0.1:
     eth-gas-reporter "^0.2.20"
     sha1 "^1.1.1"
 
+hardhat-typechain@^0.3.4:
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.4.tgz#6d7d86184152b5a3c83bde0fbbb26224b6fbfd70"
+  integrity sha512-oI9YSutDfZnRlAV1bYTpLkBHw4rkhz9JDWAEXz2PR34ylpgLWxPFbPiHT5QXadGTlBqJUAT6JSTxCK1kADMkjA==
+
 hardhat@^2.0.3:
   version "2.0.8"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.8.tgz#6ec232293dd6b3ca7baeadb095ba4afce4b9b2e0"
