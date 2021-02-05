@@ -14,7 +14,7 @@ pragma solidity ^0.6.0;
  * the functions of your contract. Note that they will not be pausable by
  * simply including this module, only once the modifiers are put in place.
  */
-contract Pausable {
+contract PowerPausable {
   /**
    * @dev Emitted when the pause is triggered by `account`.
    */

@@ -6,11 +6,11 @@ import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerPokeStaking.sol";
-import "./utils/Ownable.sol";
-import "./utils/Pausable.sol";
+import "./utils/PowerOwnable.sol";
+import "./utils/PowerPausable.sol";
 import "./PowerPokeStakingStorageV1.sol";
 
-contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable, PowerPokeStakingStorageV1 {
+contract PowerPokeStaking is IPowerPokeStaking, PowerOwnable, Initializable, PowerPausable, PowerPokeStakingStorageV1 {
   using SafeMath for uint256;
 
   uint256 public constant HUNDRED_PCT = 100 ether;

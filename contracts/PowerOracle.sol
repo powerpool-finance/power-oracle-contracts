@@ -10,11 +10,11 @@ import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IPowerPoke.sol";
 import "./UniswapTWAPProvider.sol";
-import "./utils/Pausable.sol";
-import "./utils/Ownable.sol";
+import "./utils/PowerPausable.sol";
+import "./utils/PowerOwnable.sol";
 import "./PowerPoke.sol";
 
-contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
+contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable, UniswapTWAPProvider {
   using SafeMath for uint256;
   using SafeCast for uint256;
 

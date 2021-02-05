@@ -12,12 +12,12 @@ import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IEACAggregatorProxy.sol";
 import "./interfaces/IPowerPoke.sol";
-import "./utils/Ownable.sol";
-import "./utils/Pausable.sol";
+import "./utils/PowerOwnable.sol";
+import "./utils/PowerPausable.sol";
 import "./PowerPokeStaking.sol";
 import "./PowerPokeStorageV1.sol";
 
-contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGuard, PowerPokeStorageV1 {
+contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, ReentrancyGuard, PowerPokeStorageV1 {
   using SafeMath for uint256;
 
   event RewardUser(

@@ -17,7 +17,7 @@ pragma solidity ^0.6.0;
  * `onlyOwner`, which can be applied to your functions to restrict their use to
  * the owner.
  */
-contract Ownable {
+contract PowerOwnable {
   address private _owner;
 
   event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
