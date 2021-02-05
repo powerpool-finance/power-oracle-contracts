@@ -47,15 +47,14 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('>>> Deploying PowerPokeStaking...');
     const staking = await deployProxied(
       PowerPokeStaking,
-      [cvpToken.address, 60 * 60 * 5, 60 * 60 * 5],
-      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT],
+      [cvpToken.address],
+      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, 60 * 5, 60 * 5],
       { proxyAdminOwner: OWNER }
     );
     console.log('>>> PowerPokeStaking (proxy) deployed at', staking.address);
     console.log('>>> PowerPokeStaking implementation deployed at', staking.initialImplementation.address);
 
     console.log('>>> Deploying PowerPoke...');
-    // const powerPoke = await PowerPoke.new(cvpToken.address, mockWeth.address, mockFastOracle.address);
     const powerPoke = await deployProxied(
       PowerPoke,
       [cvpToken.address, mockWeth.address, mockFastOracle.address, uniswapRouter.address, staking.address],
@@ -81,7 +80,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     await powerPoke.setOracle(oracle.address);
 
     await powerPoke.addClient(oracle.address, OWNER, false, gwei(1.5), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
-    await powerPoke.setMinimalDeposits(oracle.address, MIN_SLASHING_DEPOSIT, MIN_SLASHING_DEPOSIT);
+    await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
