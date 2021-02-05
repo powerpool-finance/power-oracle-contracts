@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/SafeCast.sol";
 import "./interfaces/IPowerOracle.sol";
+import "./interfaces/IPowerPoke.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
@@ -21,11 +22,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
   uint256 internal constant COMPENSATION_GAS_EXTRA = 21_000;
   uint256 public constant HUNDRED_PCT = 100 ether;
-
-  struct Price {
-    uint128 timestamp;
-    uint128 value;
-  }
 
   /// @notice The event emitted when a reporter calls a poke operation
   event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
@@ -45,15 +41,6 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
   /// @notice CVP token address
   IERC20 public immutable CVP_TOKEN;
 
-  /// @notice The linked PowerOracleStaking contract address
-  PowerPoke public powerPoke;
-
-  /// @notice Official prices and timestamps by symbol hash
-  mapping(bytes32 => Price) public prices;
-
-  /// @notice Last slasher update time by a user ID
-  mapping(uint256 => uint256) public lastSlasherUpdates;
-
   modifier onlyReporter(uint256 reporterId_, bytes calldata rewardOpts) {
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
@@ -72,7 +59,7 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
 
   function initialize(address owner_, address powerPoke_) external initializer {
     _transferOwnership(owner_);
-    powerPoke = PowerPoke(powerPoke_);
+    powerPoke = IPowerPoke(powerPoke_);
   }
 
   /*** Current Poke Interface ***/
