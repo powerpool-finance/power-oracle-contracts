@@ -117,9 +117,9 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
   constructor(
     address cvpToken_,
-  // TODO: move to initializer
+    // TODO: move to initializer
     uint256 depositTimeout_,
-  // TODO: move to initializer
+    // TODO: move to initializer
     uint256 withdrawTimeout_
   ) public {
     require(cvpToken_ != address(0), "CVP_ADDR_IS_0");
@@ -320,11 +320,7 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     uint256 hdhId = _hdhId;
     uint256 hdhDeposit = users[hdhId].deposit;
 
-    uint256 product = times_.mul(hdhDeposit);
-    // uint256 slasherReward = times_ * reporterDeposit * slasherRewardPct / HUNDRED_PCT;
-    uint256 slasherReward = product.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
-    // uint256 reservoirReward = times_ * reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
-    uint256 reservoirReward = product.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
+    (uint256 slasherReward, uint256 reservoirReward, ) = getSlashAmount(hdhId, times_);
 
     uint256 amount = slasherReward.add(reservoirReward);
     require(hdhDeposit >= amount, "INSUFFICIENT_HDH_DEPOSIT");
@@ -334,8 +330,6 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
     // totalDeposit = totalDeposit - reservoirReward; (slasherReward is kept on the contract)
     totalDeposit = totalDeposit.sub(reservoirReward);
-
-    emit Slash(slasherId_, hdhId, slasherReward, reservoirReward);
 
     if (slasherReward > 0) {
       // uint256 slasherDepositAfter = users[slasherId_].deposit + slasherReward
@@ -347,6 +341,8 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     if (reservoirReward > 0) {
       CVP_TOKEN.transfer(reservoir, reservoirReward);
     }
+
+    emit Slash(slasherId_, hdhId, slasherReward, reservoirReward);
   }
 
   /*** OWNER INTERFACE ***/
@@ -433,6 +429,25 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     return (users[userId_].pendingWithdrawal, users[userId_].pendingWithdrawalTimeout);
   }
 
+  function getSlashAmount(uint256 slasheeId_, uint256 times_)
+    public
+    view
+    override
+    returns (
+      uint256 slasherReward,
+      uint256 reservoirReward,
+      uint256 totalSlash
+    )
+  {
+    uint256 product = times_.mul(users[slasheeId_].deposit);
+    // slasherReward = times_ * reporterDeposit * slasherRewardPct / HUNDRED_PCT;
+    slasherReward = product.mul(slasherSlashingRewardPct) / HUNDRED_PCT;
+    // reservoirReward = times_ * reporterDeposit * reservoirSlashingRewardPct / HUNDRED_PCT;
+    reservoirReward = product.mul(protocolSlashingRewardPct) / HUNDRED_PCT;
+    // totalSlash = slasherReward + reservoirReward
+    totalSlash = slasherReward.add(reservoirReward);
+  }
+
   function getUserStatus(
     uint256 userId_,
     address pokerKey_,
@@ -472,6 +487,13 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view override {
     require(users[userId_].adminKey == adminKey_, "INVALID_AMIN_KEY");
+  }
+
+  function requireValidAdminOrPokerKey(uint256 userId_, address adminOrPokerKey_) external view override {
+    require(
+      users[userId_].adminKey == adminOrPokerKey_ || users[userId_].pokerKey == adminOrPokerKey_,
+      "INVALID_AMIN_OR_POKER_KEY"
+    );
   }
 
   function getLastDepositChange(uint256 userId_) external view override returns (uint256) {

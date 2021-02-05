@@ -52,6 +52,15 @@ interface IPowerPokeStaking {
 
   function getPendingWithdrawalOf(uint256 userId_) external view returns (uint256 balance, uint256 timeout);
 
+  function getSlashAmount(uint256 slasheeId_, uint256 times_)
+    external
+    view
+    returns (
+      uint256 slasherReward,
+      uint256 reservoirReward,
+      uint256 totalSlash
+    );
+
   function getUserStatus(
     uint256 userId_,
     address reporterKey_,
@@ -73,6 +82,8 @@ interface IPowerPokeStaking {
   ) external view;
 
   function requireValidAdminKey(uint256 userId_, address adminKey_) external view;
+
+  function requireValidAdminOrPokerKey(uint256 userId_, address adminOrPokerKey_) external view;
 
   function getLastDepositChange(uint256 userId_) external view returns (uint256);
 }

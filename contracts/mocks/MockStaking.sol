@@ -15,7 +15,7 @@ contract MockStaking is PowerPokeStaking {
     totalDeposit = totalDeposit_;
   }
 
-  event MockSlash(uint256 userId, uint256 times);
+  event MockSlash(uint256 slasherId, uint256 times);
 
   function slashHDH(uint256 slasherId_, uint256 times_) external override(PowerPokeStaking) {
     emit MockSlash(slasherId_, times_);

@@ -8,4 +8,8 @@ contract MockFastGasOracle {
   constructor(uint256 latestAnswer_) public {
     latestAnswer = latestAnswer_;
   }
+
+  function setLatestAnswer(uint256 latestAnswer_) external {
+    latestAnswer = latestAnswer_;
+  }
 }

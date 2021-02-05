@@ -181,7 +181,7 @@ function kether(v) {
 }
 
 function address(n) {
-  return `0x${n.toString(16).padStart(40, '0')}`;
+  return web3.utils.toChecksumAddress(`0x${n.toString(16).padStart(40, '0')}`);
 }
 
 function keccak256(str) {

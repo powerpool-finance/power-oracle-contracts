@@ -13,13 +13,13 @@ import "./utils/Pausable.sol";
 import "./utils/Ownable.sol";
 import "./PowerPoke.sol";
 
-// Gas Compensation Plans:
-// 1 - for pokeFromReporter and slashReporter
-// 2 - for slasherHeartbeat
 contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapTWAPProvider {
   using SafeMath for uint256;
   using SafeCast for uint256;
 
+  uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
+  uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
+  uint256 internal constant COMPENSATION_GAS_EXTRA = 21_000;
   uint256 public constant HUNDRED_PCT = 100 ether;
 
   struct Price {
@@ -58,8 +58,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
     _;
-    uint256 gasUsed = gasStart.sub(gasleft());
-    powerPoke.reward(reporterId_, gasUsed, 1, rewardOpts);
+    uint256 gasUsed = gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA;
+    powerPoke.reward(reporterId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
   }
 
   constructor(
@@ -206,8 +206,8 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
       _updateSlasherTimestamp(slasherId_, false);
       powerPoke.slashReporter(slasherId_, overdueCount);
 
-      uint256 gasUsed = gasStart.sub(gasleft());
-      powerPoke.reward(slasherId_, gasUsed, 1, rewardOpts);
+      uint256 gasUsed = gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA;
+      powerPoke.reward(slasherId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
     } else {
       // treat it as a slasherHeartbeat call, do neither compensate nor reward
       _updateSlasherTimestamp(slasherId_, true);
@@ -225,7 +225,12 @@ contract PowerOracle is IPowerOracle, Ownable, Initializable, Pausable, UniswapT
     PowerPoke.PokeRewardOptions memory opts = PowerPoke.PokeRewardOptions(msg.sender, false);
     bytes memory rewardConfig = abi.encode(opts);
     // reward in CVP
-    powerPoke.reward(slasherId_, gasStart.sub(gasleft()), 2, rewardConfig);
+    powerPoke.reward(
+      slasherId_,
+      gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA,
+      COMPENSATION_PLAN_2_ID,
+      rewardConfig
+    );
   }
 
   function _updateSlasherTimestamp(uint256 _slasherId, bool assertOnTimeDelta) internal {
