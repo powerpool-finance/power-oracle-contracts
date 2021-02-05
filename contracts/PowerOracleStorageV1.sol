@@ -30,7 +30,4 @@ contract PowerOracleStorageV1 {
 
   /// @notice The new observation for each symbolHash
   mapping(bytes32 => Observation) public newObservations;
-
-  // Reserved storage space to allow for layout changes in the future.
-  uint256[50] private ______gap;
 }

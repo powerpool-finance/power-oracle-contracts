@@ -38,7 +38,4 @@ contract PowerPokeStorageV1 {
   mapping(address => Client) public clients;
 
   mapping(address => mapping(uint256 => BonusPlan)) public bonusPlans;
-
-  // Reserved storage space to allow for layout changes in the future.
-  uint256[50] private ______gap;
 }
