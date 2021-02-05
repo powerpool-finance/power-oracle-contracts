@@ -56,16 +56,16 @@ describe('PowerPoke', function () {
     const powerPokeOptsStruct = {
       PowerPokeRewardOpts: {
         to: 'address',
-        rewardsInEth: 'bool',
+        compensateInETH: 'bool',
       },
     };
     powerPokeOptsCVP = web3.eth.abi.encodeParameter(powerPokeOptsStruct, {
       to: constants.ZERO_ADDRESS,
-      rewardsInEth: false,
+      compensateInETH: false,
     });
     powerPokeOptsETH = web3.eth.abi.encodeParameter(powerPokeOptsStruct, {
       to: alice,
-      rewardsInEth: true,
+      compensateInETH: false,
     });
   });
 
