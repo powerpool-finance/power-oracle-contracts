@@ -70,7 +70,7 @@
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
     "deploy:testnet:local": "hardhat deploy-testnet --network local",
     "deploy:testnet:kovan": "hardhat deploy-testnet --network kovan",
-    "lint:sol": "solhint --config ./.solhint.json --max-warnings 0 \"contracts/**/*.sol\"",
+    "lint:sol": "solhint --config ./.solhint.json \"contracts/**/*.sol\"",
     "lint:js": "eslint --config .eslintrc.json --ignore-path ./.eslintignore --ext .js .",
     "node": "hardhat node",
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
