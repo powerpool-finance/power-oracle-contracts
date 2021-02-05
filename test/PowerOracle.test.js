@@ -28,7 +28,6 @@ const MAX_REPORT_INTERVAL = '90';
 const MAX_REPORT_INTERVAL_INT = 90;
 const SLASHER_HEARTBEAT_INTERVAL = 120;
 const DEPOSIT_TIMEOUT = '30';
-const WITHDRAWAL_TIMEOUT = '180';
 const WETH = address(111);
 
 function expectPriceUpdateEvent(config) {
