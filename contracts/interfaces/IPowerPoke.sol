@@ -83,6 +83,10 @@ interface IPowerPoke {
 
   function setOracle(address oracle_) external;
 
+  function pause() external;
+
+  function unpause() external;
+
   /*** GETTERS ***/
   function creditOf(address client_) external view returns (uint256);
 

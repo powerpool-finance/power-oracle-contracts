@@ -17,7 +17,7 @@ import "./utils/Pausable.sol";
 import "./PowerPokeStaking.sol";
 import "./PowerPokeStorageV1.sol";
 
-contract PowerPoke is IPowerPoke, Ownable, Initializable, ReentrancyGuard, PowerPokeStorageV1 {
+contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGuard, PowerPokeStorageV1 {
   using SafeMath for uint256;
 
   event RewardUser(
@@ -177,7 +177,7 @@ contract PowerPoke is IPowerPoke, Ownable, Initializable, ReentrancyGuard, Power
     uint256 gasUsed_,
     uint256 compensationPlan_,
     bytes calldata pokeOptions_
-  ) external override nonReentrant {
+  ) external override nonReentrant whenNotPaused {
     RewardHelperStruct memory helper;
     require(clients[msg.sender].active, "INVALID_CLIENT");
     if (gasUsed_ == 0) {
@@ -351,6 +351,20 @@ contract PowerPoke is IPowerPoke, Ownable, Initializable, ReentrancyGuard, Power
   function setOracle(address oracle_) external override onlyOwner {
     oracle = IPowerOracle(oracle_);
     emit SetOracle(oracle_);
+  }
+
+  /**
+   * @notice The owner pauses reward-operation
+   */
+  function pause() external override onlyOwner {
+    _pause();
+  }
+
+  /**
+   * @notice The owner unpauses reward-operation
+   */
+  function unpause() external override onlyOwner {
+    _unpause();
   }
 
   /*** INTERNAL HELPERS ***/

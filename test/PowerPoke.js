@@ -208,6 +208,36 @@ describe('PowerPoke', function () {
         await expect(poke.setOracle(alice, { from: clientAOwner })).to.be.revertedWith('NOT_THE_OWNER');
       });
     });
+
+    describe('pause', () => {
+      it('should allow the owner pausing the contract', async function() {
+        expect(await poke.paused()).to.be.false;
+        await poke.pause({ from: owner });
+        expect(await poke.paused()).to.be.true;
+      });
+
+      it('should deny non-owner pausing the contract', async function() {
+        await expect(poke.pause({ from: alice }))
+          .to.be.revertedWith('NOT_THE_OWNER');
+      });
+    })
+
+    describe('unpause', () => {
+      beforeEach(async function() {
+        await poke.pause({ from: owner });
+      });
+
+      it('should allow the owner unpausing the contract', async function() {
+        expect(await poke.paused()).to.be.true;
+        await poke.unpause({ from: owner });
+        expect(await poke.paused()).to.be.false;
+      });
+
+      it('should deny non-owner unpausing the contract', async function() {
+        await expect(poke.unpause({ from: alice }))
+          .to.be.revertedWith('NOT_THE_OWNER');
+      });
+    })
   });
 
   describe('client contract interface', () => {
@@ -445,7 +475,12 @@ describe('PowerPoke', function () {
 
       it('should revert if the client is disabled', async function () {
         await poke.setClientActiveFlag(clientA, false, { from: owner });
-        await expect(poke.reward(1, 370000, ACTIVE_PLAN_1, powerPokeOptsCVP, { from: clientA })).to.be.revertedWith('');
+        await expect(poke.reward(1, 370000, ACTIVE_PLAN_1, powerPokeOptsCVP, { from: clientA })).to.be.revertedWith('INVALID_CLIENT');
+      });
+
+      it('should revert if the pausd flag is on', async function () {
+        await poke.pause({ from: owner });
+        await expect(poke.reward(1, 370000, ACTIVE_PLAN_1, powerPokeOptsCVP, { from: clientA })).to.be.revertedWith('PAUSED');
       });
     });
   });
