@@ -12,8 +12,8 @@ contract PowerOracleStorageV1 {
   }
 
   struct Observation {
-    uint timestamp;
-    uint acc;
+    uint256 timestamp;
+    uint256 acc;
   }
 
   /// @notice The linked PowerOracleStaking contract address

@@ -227,7 +227,7 @@ contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGu
   }
 
   /*** CLIENT OWNER INTERFACE ***/
-  function addCredit(address client_, uint256 amount_) override external {
+  function addCredit(address client_, uint256 amount_) external override {
     Client storage client = clients[client_];
 
     require(client.active, "ONLY_ACTIVE_CLIENT");
