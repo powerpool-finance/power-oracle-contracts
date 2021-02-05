@@ -475,6 +475,19 @@ describe('PowerPokeStaking', function () {
       })
     });
 
+    describe('setTimeouts', () => {
+      it('should allow the owner setting the values', async function() {
+        await staking.setTimeouts(888, 999, { from: owner });
+        expect(await staking.depositTimeout()).to.be.equal('888');
+        expect(await staking.withdrawalTimeout()).to.be.equal('999');
+      })
+
+      it('should deny non-owner setting the value', async function() {
+        await expect(staking.setTimeouts(ether(40), ether(30), { from: alice }))
+          .to.be.revertedWith('NOT_THE_OWNER');
+      })
+    });
+
     describe('pause', () => {
       it('should allow the owner pausing the contract', async function() {
         expect(await staking.paused()).to.be.false;

@@ -48,6 +48,9 @@ contract PowerPokeStaking is IPowerPokeStaking, PowerOwnable, Initializable, Pow
   /// @notice The event emitted when the owner sets new slashing percent values, where 1ether == 1%
   event SetSlashingPct(uint256 slasherSlashingRewardPct, uint256 protocolSlashingRewardPct);
 
+  /// @notice The event emitted when the owner sets new deposit and withdrawal timeouts
+  event SetTimeouts(uint256 depositTimeout, uint256 withdrawalTimeout);
+
   /// @notice The event emitted when the owner sets a new PowerOracle linked contract
   event SetSlasher(address powerOracle);
 
@@ -322,6 +325,12 @@ contract PowerPokeStaking is IPowerPokeStaking, PowerOwnable, Initializable, Pow
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = protocolSlashingRewardPct_;
     emit SetSlashingPct(slasherSlashingRewardPct_, protocolSlashingRewardPct_);
+  }
+
+  function setTimeouts(uint256 depositTimeout_, uint256 withdrawalTimeout_) external override onlyOwner {
+    depositTimeout = depositTimeout_;
+    withdrawalTimeout = withdrawalTimeout_;
+    emit SetTimeouts(depositTimeout_, withdrawalTimeout_);
   }
 
   /**
