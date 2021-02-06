@@ -96,7 +96,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await powerPoke.addClient(oracle.address, OWNER, false, gwei(1.5), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
     await powerPoke.setBonusPlan(oracle.address, '1', true, '20', '10', '100000');
-    await powerPoke.setBonusPlan(oracle.address, '1', true, '20', '10', '100000');
+    await powerPoke.setBonusPlan(oracle.address, '2', true, '20', '10', '100000');
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
