@@ -45,6 +45,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const RESERVOIR_REWARD_PCT = '0';//ether('0.005');
     const BONUS_NUMERATOR = '7610350076';
     const BONUS_DENUMERATOR = '10000000000000000';
+    const MAX_GAS_PRICE = gwei(500);
 
     const OWNER = '0xB258302C3f209491d604165549079680708581Cc';
     const PROXY_OWNER = OWNER;
@@ -86,7 +87,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('>>> Setting powerOracle address in powerOracleStaking');
     await powerPoke.setOracle(oracle.address);
 
-    await powerPoke.addClient(oracle.address, deployer, false, gwei(1.5), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
+    await powerPoke.addClient(oracle.address, deployer, false, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
     await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, '100000');
     await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, '100000');
@@ -137,14 +138,12 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
         compensateInETH: true
       },
     );
+    const pokeOptions = {from: deployer, gasPrice: gwei('100')};
+    console.log('getGasPriceFor', fromWei(await powerPoke.contract.methods.getGasPriceFor(oracle.address).call(pokeOptions), 'gwei'));
 
-    const ethBefore = fromWei(await web3.eth.getBalance(deployer));
-    const res = await oracle.pokeFromReporter('1', ['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE'], powerPokeOpts)
+    const res = await oracle.pokeFromReporter('1', ['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE'], powerPokeOpts, pokeOptions)
 
     const ethUsedByPoke = await ethUsed(web3, res.receipt);
-    const ethAfter = fromWei(await web3.eth.getBalance(deployer));
-    console.log('ethBefore', ethBefore);
-    console.log('ethAfter', ethAfter);
     console.log('ethUsed', ethUsedByPoke);
     console.log('ethCompensated', fromWei(await web3.eth.getBalance(testWallet.address)));
 

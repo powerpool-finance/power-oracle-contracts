@@ -83,8 +83,8 @@ function tether(value) {
   return web3.utils.toWei(value, 'tether').toString();
 }
 
-function fromWei(value) {
-  return web3.utils.fromWei(value, 'ether');
+function fromWei(value, to = 'ether') {
+  return web3.utils.fromWei(value, to);
 }
 
 function mwei(value) {
