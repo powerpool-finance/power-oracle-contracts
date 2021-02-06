@@ -1,14 +1,13 @@
 /* global task */
 
-const pIteration = require('p-iteration');
 const _ = require('lodash');
 
 require('@nomiclabs/hardhat-truffle5');
 
 task('deploy-mainnet', 'Deploys mainnet contracts')
   .setAction(async (__, { ethers, network }) => {
-    const { deployProxied, ether, address, keccak256, uint, gwei, impersonateAccount } = require('../test/helpers');
-    const { constants } = require('@openzeppelin/test-helpers');
+    const { deployProxied, ether, fromWei, gwei, impersonateAccount, ethUsed } = require('../test/helpers');
+    const { constants, time } = require('@openzeppelin/test-helpers');
 
     const PowerPokeStaking = artifacts.require('PowerPokeStaking');
     const PowerOracle = artifacts.require('PowerOracle');
@@ -44,14 +43,8 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const SLASHER_REWARD_PCT = '0';//ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const RESERVOIR_REWARD_PCT = '0';//ether('0.005');
-    // 1 ether == 1%
-    const CVP_APY = ether(20);
-    // count
-    const TOTAL_REPORTS_PER_YEAR = '105120';
-    // In gas
-    const GAS_EXPENSES_PER_ASSET_REPORT = '85000';
-    // In wei
-    const GAS_PRICE_LIMIT = gwei(1000);
+    const BONUS_NUMERATOR = '7610350076';
+    const BONUS_DENUMERATOR = '10000000000000000';
 
     const OWNER = '0xB258302C3f209491d604165549079680708581Cc';
     const PROXY_OWNER = OWNER;
@@ -63,8 +56,8 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const staking = await deployProxied(
       PowerPokeStaking,
       [cvpAddress],
-      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, 60 * 5, 60 * 5],
-      { proxyAdminOwner: OWNER }
+      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, MIN_REPORT_INTERVAL, MIN_REPORT_INTERVAL],
+      { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
     console.log('>>> PowerOracleStaking implementation deployed at', staking.initialImplementation.address);
@@ -73,7 +66,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerPoke,
       [cvpAddress, wethAddress, gasPriceOracle, uniswapRouterAddress, staking.address],
       [deployer, constants.ZERO_ADDRESS],
-      { proxyAdminOwner: OWNER }
+      { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerPoke (proxy) deployed at', powerPoke.address);
     console.log('>>> PowerPoke implementation deployed at', powerPoke.initialImplementation.address);
@@ -85,7 +78,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerOracle,
       [cvpAddress, ANCHOR_PERIOD, configs],
       [OWNER, powerPoke.address],
-      { proxyAdminOwner: OWNER }
+      { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerOracle (proxy) deployed at', oracle.address);
     console.log('>>> PowerOracle implementation deployed at', oracle.initialImplementation.address);
@@ -93,14 +86,13 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('>>> Setting powerOracle address in powerOracleStaking');
     await powerPoke.setOracle(oracle.address);
 
-    await powerPoke.addClient(oracle.address, OWNER, false, gwei(1.5), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
+    await powerPoke.addClient(oracle.address, deployer, false, gwei(1.5), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
-    await powerPoke.setBonusPlan(oracle.address, '1', true, '20', '10', '100000');
-    await powerPoke.setBonusPlan(oracle.address, '2', true, '20', '10', '100000');
+    await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, '100000');
+    await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, '100000');
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
-    await oracle.transferOwnership(OWNER);
     await powerPoke.transferOwnership(OWNER);
     await powerPoke.transferClientOwnership(oracle.address, OWNER);
 
@@ -114,6 +106,12 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const fromOwner = {from: OWNER};
     await impersonateAccount(ethers, OWNER);
 
+    await web3.eth.sendTransaction({
+      from: deployer,
+      to: OWNER,
+      value: ether(10),
+    })
+
     await cvpToken.approve(powerPoke.address, ether(10000), fromOwner);
     await powerPoke.addCredit(oracle.address, ether(10000), fromOwner);
 
@@ -121,10 +119,38 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await cvpToken.approve(staking.address, MIN_SLASHING_DEPOSIT, {from: deployer});
     await staking.createUser(deployer, deployer, MIN_SLASHING_DEPOSIT, {from: deployer});
 
-    await oracle.pokeFromReporter()
-    console.log('>>> Making the initial poke');
-    await oracle.poke(['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE']);
+    await time.increase(MIN_REPORT_INTERVAL);
 
+    await staking.executeDeposit('1',{from: deployer});
+
+    const testWallet = ethers.Wallet.createRandom();
+    console.log('>>> Making the initial poke');
+    const powerPokeOpts = web3.eth.abi.encodeParameter(
+      {
+        PowerPokeRewardOpts: {
+          to: 'address',
+          compensateInETH: 'bool'
+        },
+      },
+      {
+        to: testWallet.address,
+        compensateInETH: true
+      },
+    );
+
+    const ethBefore = fromWei(await web3.eth.getBalance(deployer));
+    const res = await oracle.pokeFromReporter('1', ['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE'], powerPokeOpts)
+
+    const ethUsedByPoke = await ethUsed(web3, res.receipt);
+    const ethAfter = fromWei(await web3.eth.getBalance(deployer));
+    console.log('ethBefore', ethBefore);
+    console.log('ethAfter', ethAfter);
+    console.log('ethUsed', ethUsedByPoke);
+    console.log('ethCompensated', fromWei(await web3.eth.getBalance(testWallet.address)));
+
+    console.log('powerPoke.rewards(1)', fromWei(await powerPoke.rewards(1)));
+    await powerPoke.withdrawRewards(1, deployer);
+    console.log('cvpToken.balanceOf(deployer)', fromWei(await cvpToken.balanceOf(deployer)));
   });
 
 module.exports = {};

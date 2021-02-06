@@ -83,6 +83,10 @@ function tether(value) {
   return web3.utils.toWei(value, 'tether').toString();
 }
 
+function fromWei(value) {
+  return web3.utils.fromWei(value, 'ether');
+}
+
 function mwei(value) {
   return web3.utils.toWei(value, 'mwei').toString();
 }
@@ -200,6 +204,11 @@ function toInt(n) {
   return parseInt(n, 10);
 }
 
+async function ethUsed(web3, receipt) {
+  const tx = await web3.eth.getTransaction(receipt.transactionHash);
+  return fromWei(new BigNumber(receipt.gasUsed.toString()).multipliedBy(new BigNumber(tx.gasPrice.toString())).toString());
+}
+
 function strSum(a, b) {
   return String(toInt(a) + toInt(b));
 }
@@ -251,6 +260,7 @@ module.exports = {
   createOrGetProxyAdmin,
   deployProxied,
   ether,
+  fromWei,
   mwei,
   gwei,
   tether,
@@ -267,6 +277,7 @@ module.exports = {
   toInt,
   strSum,
   fixed,
+  ethUsed,
   forkContractUpgrade,
   deployAndSaveArgs,
   increaseTime,
