@@ -124,32 +124,54 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     await staking.executeDeposit('1',{from: deployer});
 
-    const testWallet = ethers.Wallet.createRandom();
-    console.log('>>> Making the initial poke');
-    const powerPokeOpts = web3.eth.abi.encodeParameter(
-      {
-        PowerPokeRewardOpts: {
-          to: 'address',
-          compensateInETH: 'bool'
-        },
-      },
-      {
-        to: testWallet.address,
-        compensateInETH: true
-      },
-    );
-    const pokeOptions = {from: deployer, gasPrice: gwei('100')};
-    console.log('getGasPriceFor', fromWei(await powerPoke.contract.methods.getGasPriceFor(oracle.address).call(pokeOptions), 'gwei'));
+    await pokeFromReporter();
 
-    const res = await oracle.pokeFromReporter('1', ['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE'], powerPokeOpts, pokeOptions)
+    await time.increase(MIN_REPORT_INTERVAL);
 
-    const ethUsedByPoke = await ethUsed(web3, res.receipt);
-    console.log('ethUsed', ethUsedByPoke);
-    console.log('ethCompensated', fromWei(await web3.eth.getBalance(testWallet.address)));
+    await pokeFromReporter();
 
-    console.log('powerPoke.rewards(1)', fromWei(await powerPoke.rewards(1)));
-    await powerPoke.withdrawRewards(1, deployer);
-    console.log('cvpToken.balanceOf(deployer)', fromWei(await cvpToken.balanceOf(deployer)));
+    await time.increase(MIN_REPORT_INTERVAL);
+
+    await pokeFromReporter();
+
+    async function pokeFromReporter() {
+      let {testAddress, testOpts} = await generateTestWalletAndCompensateOpts(web3, ethers);
+      console.log('\n>>> Making the poke');
+      const pokeOptions = {from: deployer, gasPrice: gwei('100')};
+      console.log('getGasPriceFor', fromWei(await powerPoke.contract.methods.getGasPriceFor(oracle.address).call(pokeOptions), 'gwei'));
+
+      let res = await oracle.pokeFromReporter('1', ['ETH', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'KP3R', 'PICKLE', 'GRT', 'WHITE'], testOpts, pokeOptions)
+
+      const ethUsedByPoke = await ethUsed(web3, res.receipt);
+      console.log('ethUsed', ethUsedByPoke);
+      console.log('ethCompensated', fromWei(await web3.eth.getBalance(testAddress)));
+
+      console.log('powerPoke.rewards(1)', fromWei(await powerPoke.rewards(1)));
+      await powerPoke.withdrawRewards(1, deployer);
+      console.log('cvpToken.balanceOf(deployer)', fromWei(await cvpToken.balanceOf(deployer)));
+
+      console.log('cvp price', fromWei(await oracle.assetPrices(cvpAddress)));
+    }
   });
+
+async function generateTestWalletAndCompensateOpts(web3, ethers) {
+  const testWallet = ethers.Wallet.createRandom();
+  const powerPokeOpts = web3.eth.abi.encodeParameter(
+    {
+      PowerPokeRewardOpts: {
+        to: 'address',
+        compensateInETH: 'bool'
+      },
+    },
+    {
+      to: testWallet.address,
+      compensateInETH: true
+    },
+  );
+  return {
+    testAddress: testWallet.address,
+    testOpts: powerPokeOpts
+  }
+}
 
 module.exports = {};
