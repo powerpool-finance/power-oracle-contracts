@@ -237,6 +237,15 @@ async function deployAndSaveArgs(Contract, args) {
   return newInstance;
 }
 
+async function impersonateAccount(ethers, adminAddress) {
+  await ethers.provider.getSigner().sendTransaction({
+    to: adminAddress,
+    value: '0x' + new BigNumber(ether('1')).toString(16)
+  })
+
+  await ethers.provider.send('hardhat_impersonateAccount', [adminAddress]);
+}
+
 module.exports = {
   advanceBlocks,
   createOrGetProxyAdmin,
@@ -260,5 +269,6 @@ module.exports = {
   fixed,
   forkContractUpgrade,
   deployAndSaveArgs,
-  increaseTime
+  increaseTime,
+  impersonateAccount
 }

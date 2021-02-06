@@ -7,7 +7,7 @@ const pIteration = require('p-iteration');
 const _ = require('lodash');
 
 task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
-  .setAction(async (__, {ethers}) => {
+  .setAction(async (__, { ethers }) => {
     const { keccak256, forkContractUpgrade, deployAndSaveArgs, increaseTime } = require('../test/helpers');
     const PowerOracle = artifacts.require('PowerOracle');
     PowerOracle.numberFormat = 'String';
