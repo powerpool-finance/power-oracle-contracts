@@ -568,6 +568,29 @@ describe('PowerPoke', function () {
       await poke.addClient(clientA, clientAOwner, true, gwei(300), 5, 6, { from: owner });
     });
 
+    describe('transferClientOwnership', () => {
+      it('should transfer the client ownership to the given address', async function () {
+        expect(await poke.ownerOf(clientA), clientAOwner);
+        const res = await poke.transferClientOwnership(clientA, bob, { from: clientAOwner });
+        expect(await poke.ownerOf(clientA), bob);
+        expectEvent(res, 'TransferClientOwnership', {
+          client: clientA,
+          from: clientAOwner,
+          to: bob
+        })
+      });
+
+      it('should deny calling the method from non-owner', async function () {
+        await expect(poke.transferClientOwnership(clientA, bob, { from: bob }))
+          .to.be.revertedWith('ONLY_CLIENT_OWNER');
+      });
+
+      it('should deny calling the method on non-existent client', async function () {
+        await expect(poke.transferClientOwnership(alice, bob, { from: alice }))
+          .to.be.revertedWith('ONLY_CLIENT_OWNER');
+      });
+    });
+
     describe('addCredit', () => {
       it('should increment balance', async function () {
         expect(await poke.creditOf(clientA)).to.be.equal(ether(0));

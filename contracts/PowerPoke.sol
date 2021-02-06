@@ -36,6 +36,8 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
     uint256 earnedETH
   );
 
+  event TransferClientOwnership(address indexed client, address indexed from, address indexed to);
+
   event SetReportIntervals(address indexed client, uint256 minReportInterval, uint256 maxReportInterval);
 
   event SetGasPriceLimit(address indexed client, uint256 gasPriceLimit);
@@ -227,6 +229,11 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
   }
 
   /*** CLIENT OWNER INTERFACE ***/
+  function transferClientOwnership(address client_, address to_) external override onlyClientOwner(client_) {
+    clients[client_].owner = to_;
+    emit TransferClientOwnership(client_, msg.sender, to_);
+  }
+
   function addCredit(address client_, uint256 amount_) external override {
     Client storage client = clients[client_];
 

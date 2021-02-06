@@ -33,6 +33,8 @@ interface IPowerPoke {
   ) external;
 
   /*** CLIENT OWNER INTERFACE ***/
+  function transferClientOwnership(address client_, address to_) external;
+
   function addCredit(address client_, uint256 amount_) external;
 
   function withdrawCredit(
