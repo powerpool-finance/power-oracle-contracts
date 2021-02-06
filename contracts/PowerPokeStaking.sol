@@ -6,11 +6,11 @@ import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPowerPokeStaking.sol";
-import "./utils/Ownable.sol";
-import "./utils/Pausable.sol";
+import "./utils/PowerOwnable.sol";
+import "./utils/PowerPausable.sol";
 import "./PowerPokeStakingStorageV1.sol";
 
-contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable, PowerPokeStakingStorageV1 {
+contract PowerPokeStaking is IPowerPokeStaking, PowerOwnable, Initializable, PowerPausable, PowerPokeStakingStorageV1 {
   using SafeMath for uint256;
 
   uint256 public constant HUNDRED_PCT = 100 ether;
@@ -47,6 +47,9 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
 
   /// @notice The event emitted when the owner sets new slashing percent values, where 1ether == 1%
   event SetSlashingPct(uint256 slasherSlashingRewardPct, uint256 protocolSlashingRewardPct);
+
+  /// @notice The event emitted when the owner sets new deposit and withdrawal timeouts
+  event SetTimeouts(uint256 depositTimeout, uint256 withdrawalTimeout);
 
   /// @notice The event emitted when the owner sets a new PowerOracle linked contract
   event SetSlasher(address powerOracle);
@@ -322,6 +325,12 @@ contract PowerPokeStaking is IPowerPokeStaking, Ownable, Initializable, Pausable
     slasherSlashingRewardPct = slasherSlashingRewardPct_;
     protocolSlashingRewardPct = protocolSlashingRewardPct_;
     emit SetSlashingPct(slasherSlashingRewardPct_, protocolSlashingRewardPct_);
+  }
+
+  function setTimeouts(uint256 depositTimeout_, uint256 withdrawalTimeout_) external override onlyOwner {
+    depositTimeout = depositTimeout_;
+    withdrawalTimeout = withdrawalTimeout_;
+    emit SetTimeouts(depositTimeout_, withdrawalTimeout_);
   }
 
   /**

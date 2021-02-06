@@ -12,12 +12,12 @@ import "./interfaces/IPowerOracle.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IEACAggregatorProxy.sol";
 import "./interfaces/IPowerPoke.sol";
-import "./utils/Ownable.sol";
-import "./utils/Pausable.sol";
+import "./utils/PowerOwnable.sol";
+import "./utils/PowerPausable.sol";
 import "./PowerPokeStaking.sol";
 import "./PowerPokeStorageV1.sol";
 
-contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGuard, PowerPokeStorageV1 {
+contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, ReentrancyGuard, PowerPokeStorageV1 {
   using SafeMath for uint256;
 
   event RewardUser(
@@ -35,6 +35,8 @@ contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGu
     uint256 earnedCVP,
     uint256 earnedETH
   );
+
+  event TransferClientOwnership(address indexed client, address indexed from, address indexed to);
 
   event SetReportIntervals(address indexed client, uint256 minReportInterval, uint256 maxReportInterval);
 
@@ -227,6 +229,11 @@ contract PowerPoke is IPowerPoke, Ownable, Initializable, Pausable, ReentrancyGu
   }
 
   /*** CLIENT OWNER INTERFACE ***/
+  function transferClientOwnership(address client_, address to_) external override onlyClientOwner(client_) {
+    clients[client_].owner = to_;
+    emit TransferClientOwnership(client_, msg.sender, to_);
+  }
+
   function addCredit(address client_, uint256 amount_) external override {
     Client storage client = clients[client_];
 

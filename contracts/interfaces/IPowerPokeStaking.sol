@@ -31,6 +31,8 @@ interface IPowerPokeStaking {
 
   function setSlashingPct(uint256 slasherRewardPct, uint256 reservoirRewardPct) external;
 
+  function setTimeouts(uint256 depositTimeout_, uint256 withdrawalTimeout_) external;
+
   function pause() external;
 
   function unpause() external;

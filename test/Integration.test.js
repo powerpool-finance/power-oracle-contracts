@@ -57,12 +57,12 @@ describe('IntegrationTest', function () {
       {
         PowerPokeRewardOpts: {
           to: 'address',
-          rewardsInEth: 'bool'
+          compensateInETH: 'bool'
         },
       },
       {
         to: alice,
-        rewardsInEth: false
+        compensateInETH: false
       },
     );
   });
