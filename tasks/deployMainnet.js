@@ -45,7 +45,8 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const RESERVOIR_REWARD_PCT = '0';//ether('0.005');
     const BONUS_NUMERATOR = '7610350076';
     const BONUS_DENUMERATOR = '10000000000000000';
-    const BONUS_SLASHER_DENUMERATOR = '20000000000000000';
+    const BONUS_HEARTBEAT_NUMERATOR = '0';
+    const BONUS_HEARTBEAT_DENUMERATOR = '1800000000000000';
     const PER_GAS = '10000';
     const MAX_GAS_PRICE = gwei(500);
 
@@ -92,7 +93,8 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await powerPoke.addClient(oracle.address, deployer, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
     await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS);
-    await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_NUMERATOR, BONUS_SLASHER_DENUMERATOR, PER_GAS);
+    await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_HEARTBEAT_NUMERATOR, BONUS_HEARTBEAT_DENUMERATOR, PER_GAS);
+    await powerPoke.setSlasherHeartbeat(oracle.address, MIN_REPORT_INTERVAL);
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
@@ -156,6 +158,12 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     await poke(testAcc, 2, 'pokeFromSlasher');
 
+    await time.increase(MIN_REPORT_INTERVAL);
+
+    const res = await oracle.slasherHeartbeat(2, {from: testAcc});
+    console.log('\n\nslasherHeartbeat reward', fromWei(await powerPoke.rewards(2)));
+    console.log('slasherHeartbeat gasUsed', res.receipt.gasUsed);
+
     async function poke(from, pokerId, pokeFunc = 'pokeFromReporter') {
       let {testAddress, testOpts} = await generateTestWalletAndCompensateOpts(web3, ethers);
       console.log('\n>>> Making the ' + pokeFunc);
@@ -165,10 +173,11 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       let res = await oracle[pokeFunc](pokerId, symbolsToPoke, testOpts, pokeOptions)
 
       const ethUsedByPoke = await ethUsed(web3, res.receipt);
+      console.log('gasUsed', res.receipt.gasUsed);
       console.log('ethUsed', ethUsedByPoke);
       console.log('ethCompensated', fromWei(await web3.eth.getBalance(testAddress)));
 
-      console.log('powerPoke.rewards(1)', fromWei(await powerPoke.rewards(pokerId)));
+      console.log('powerPoke rewards', fromWei(await powerPoke.rewards(pokerId)));
       await powerPoke.withdrawRewards(pokerId, from, {from});
       // console.log('cvpToken.balanceOf(from)', fromWei(await cvpToken.balanceOf(from)));
 
