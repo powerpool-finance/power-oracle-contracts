@@ -53,6 +53,8 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
     uint128 perGas
   );
 
+  event SetFixedCompensations(address indexed client, uint256 fixedCompensationETH, uint256 fixedCompensationCVP);
+
   event SetDefaultMinDeposit(address indexed client, uint256 defaultMinDeposit);
 
   event WithdrawRewards(uint256 indexed userId, address indexed to, uint256 amount);
@@ -182,9 +184,18 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
   ) external override nonReentrant whenNotPaused {
     RewardHelperStruct memory helper;
     require(clients[msg.sender].active, "INVALID_CLIENT");
+
+    PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
+    if (opts.compensateInETH) {
+      gasUsed_ = gasUsed_.add(clients[msg.sender].fixedCompensationETH);
+    } else {
+      gasUsed_ = gasUsed_.add(clients[msg.sender].fixedCompensationCVP);
+    }
+
     if (gasUsed_ == 0) {
       return;
     }
+
     helper.ethPrice = oracle.getPriceByAsset(WETH_TOKEN);
     helper.cvpPrice = oracle.getPriceByAsset(address(CVP_TOKEN));
 
@@ -199,8 +210,6 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
     helper.totalInCVP = helper.compensationCVP.add(helper.bonusCVP);
     require(clients[msg.sender].credit >= helper.totalInCVP, "NOT_ENOUGH_CREDITS");
     clients[msg.sender].credit = clients[msg.sender].credit.sub(helper.totalInCVP);
-
-    PokeRewardOptions memory opts = abi.decode(pokeOptions_, (PokeRewardOptions));
 
     if (opts.compensateInETH) {
       helper.earnedCVP = helper.bonusCVP;
@@ -280,6 +289,16 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
   function setGasPriceLimit(address client_, uint256 gasPriceLimit_) external override onlyClientOwner(client_) {
     clients[client_].gasPriceLimit = gasPriceLimit_;
     emit SetGasPriceLimit(client_, gasPriceLimit_);
+  }
+
+  function setFixedCompensations(
+    address client_,
+    uint256 eth_,
+    uint256 cvp_
+  ) external override onlyClientOwner(client_) {
+    clients[client_].fixedCompensationETH = eth_;
+    clients[client_].fixedCompensationCVP = cvp_;
+    emit SetFixedCompensations(client_, eth_, cvp_);
   }
 
   function setBonusPlan(
