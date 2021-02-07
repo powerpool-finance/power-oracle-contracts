@@ -53,6 +53,12 @@ interface IPowerPoke {
 
   function setGasPriceLimit(address client_, uint256 gasPriceLimit_) external;
 
+  function setFixedCompensations(
+    address client_,
+    uint256 eth_,
+    uint256 cvp_
+  ) external;
+
   function setBonusPlan(
     address client_,
     uint256 planId_,

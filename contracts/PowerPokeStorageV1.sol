@@ -18,6 +18,8 @@ contract PowerPokeStorageV1 {
     uint256 slasherHeartbeat;
     uint256 gasPriceLimit;
     uint256 defaultMinDeposit;
+    uint256 fixedCompensationCVP;
+    uint256 fixedCompensationETH;
   }
 
   struct BonusPlan {

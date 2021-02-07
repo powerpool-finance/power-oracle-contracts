@@ -20,7 +20,6 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
-  uint256 internal constant COMPENSATION_GAS_EXTRA = 21_000;
   uint256 public constant HUNDRED_PCT = 100 ether;
 
   /// @notice The event emitted when a reporter calls a poke operation
@@ -45,7 +44,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
     _;
-    uint256 gasUsed = gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA;
+    uint256 gasUsed = gasStart.sub(gasleft());
     powerPoke.reward(reporterId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
   }
 
@@ -193,7 +192,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
       _updateSlasherTimestamp(slasherId_, false);
       powerPoke.slashReporter(slasherId_, overdueCount);
 
-      uint256 gasUsed = gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA;
+      uint256 gasUsed = gasStart.sub(gasleft());
       powerPoke.reward(slasherId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
     } else {
       // treat it as a slasherHeartbeat call, do neither compensate nor reward
@@ -212,12 +211,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     PowerPoke.PokeRewardOptions memory opts = PowerPoke.PokeRewardOptions(msg.sender, false);
     bytes memory rewardConfig = abi.encode(opts);
     // reward in CVP
-    powerPoke.reward(
-      slasherId_,
-      gasStart.sub(gasleft()) + COMPENSATION_GAS_EXTRA,
-      COMPENSATION_PLAN_2_ID,
-      rewardConfig
-    );
+    powerPoke.reward(slasherId_, gasStart.sub(gasleft()), COMPENSATION_PLAN_2_ID, rewardConfig);
   }
 
   function _updateSlasherTimestamp(uint256 _slasherId, bool assertOnTimeDelta) internal {

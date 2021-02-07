@@ -344,7 +344,7 @@ describe('PowerPoke', function () {
       });
     });
 
-    describe('reward', () => {
+    describe.only('reward', () => {
       const ACTIVE_PLAN_1 = '1';
       const NON_EXISTING_PLAN_2 = '2';
       const GAS_USED = '370000';
@@ -481,6 +481,32 @@ describe('PowerPoke', function () {
       it('should revert if the pausd flag is on', async function () {
         await poke.pause({ from: owner });
         await expect(poke.reward(1, 370000, ACTIVE_PLAN_1, powerPokeOptsCVP, { from: clientA })).to.be.revertedWith('PAUSED');
+      });
+
+      describe('with non-negative fixed compensation', () => {
+        beforeEach(async function() {
+          await poke.setFixedCompensations(clientA, 42000, 73000, { from: clientAOwner });
+        });
+
+        it('should add a fixed part to the gas used estimation when paying in CVP', async function () {
+          const res = await poke.reward(USER_ID, GAS_USED, ACTIVE_PLAN_1, powerPokeOptsCVP, {
+            from: clientA,
+            gasPrice: gwei(120),
+          });
+          expectEvent(res, 'RewardUser', {
+            gasUsed: String(parseInt(GAS_USED) + 73000),
+          });
+        });
+
+        it('should add a fixed part to the gas used estimation when paying in ETH', async function () {
+          const res = await poke.reward(USER_ID, GAS_USED, ACTIVE_PLAN_1, powerPokeOptsETH, {
+            from: clientA,
+            gasPrice: gwei(120),
+          });
+          expectEvent(res, 'RewardUser', {
+            gasUsed: String(parseInt(GAS_USED) + 42000),
+          });
+        });
       });
     });
   });
@@ -729,6 +755,26 @@ describe('PowerPoke', function () {
 
       it('should deny non-client owner executing the method', async function () {
         await expect(poke.setGasPriceLimit(clientA, 42, { from: bob })).to.be.revertedWith('ONLY_CLIENT_OWNER');
+      });
+    });
+
+    describe('setFixedCompensations', () => {
+      it('should update fixed compensations', async function () {
+        const res = await poke.setFixedCompensations(clientA, 30000, 12, { from: clientAOwner });
+        expectEvent(res, 'SetFixedCompensations', {
+          client: clientA,
+          fixedCompensationETH: '30000',
+          fixedCompensationCVP: '12',
+        });
+        const client = await poke.clients(clientA);
+        expect(client.fixedCompensationETH).to.be.equal('30000');
+        expect(client.fixedCompensationCVP).to.be.equal('12');
+      });
+
+      it('should deny non-client owner executing the method', async function () {
+        await expect(poke.setFixedCompensations(clientA, 30000, 12, { from: bob })).to.be.revertedWith(
+          'ONLY_CLIENT_OWNER',
+        );
       });
     });
 
