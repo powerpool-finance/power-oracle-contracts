@@ -344,7 +344,7 @@ describe('PowerPoke', function () {
       });
     });
 
-    describe.only('reward', () => {
+    describe('reward', () => {
       const ACTIVE_PLAN_1 = '1';
       const NON_EXISTING_PLAN_2 = '2';
       const GAS_USED = '370000';
