@@ -37,6 +37,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const MIN_REPORT_INTERVAL = 2700;
     // In seconds
     const MAX_REPORT_INTERVAL = 3600;
+    const STAKE_CHANGE_INTERVAL = MAX_REPORT_INTERVAL;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
     const MIN_SLASHING_DEPOSIT = ether(40); //TODO: what deposit for mainnet
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
@@ -61,7 +62,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const staking = await deployProxied(
       PowerPokeStaking,
       [cvpAddress],
-      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, MIN_REPORT_INTERVAL, MIN_REPORT_INTERVAL],
+      [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, STAKE_CHANGE_INTERVAL, STAKE_CHANGE_INTERVAL],
       { proxyAdminOwner: PROXY_OWNER }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
@@ -131,9 +132,9 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await cvpToken.approve(staking.address, deposit, {from: deployer});
     await staking.createUser(deployer, deployer, deposit, {from: deployer});
 
-    await oracle.poke( symbolsToPoke, {from: deployer});
+    await oracle.poke(symbolsToPoke, {from: deployer});
 
-    await time.increase(MIN_REPORT_INTERVAL);
+    await time.increase(MAX_REPORT_INTERVAL);
 
     await staking.executeDeposit('1',{from: deployer});
     let pokeCount = 0;
