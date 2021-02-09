@@ -39,8 +39,6 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const MAX_REPORT_INTERVAL = 3600;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
     const MIN_SLASHING_DEPOSIT = ether(40); //TODO: what deposit for mainnet
-    //gasUsed without ETH: 99339
-    //gasUsed with ETH: 267998
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const SLASHER_REWARD_PCT = '0';//ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
@@ -97,6 +95,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS);
     await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_HEARTBEAT_NUMERATOR, BONUS_HEARTBEAT_DENUMERATOR, PER_GAS);
     await powerPoke.setSlasherHeartbeat(oracle.address, MIN_REPORT_INTERVAL);
+    await powerPoke.setFixedCompensations(oracle.address, 260000, 99000);
 
     console.log('>>> Transferring powerStaking address to the owner');
     await staking.transferOwnership(OWNER);
@@ -158,10 +157,10 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await time.increase(MAX_REPORT_INTERVAL);
 
     await staking.executeDeposit(2,{from: testAcc});
-
-    await poke(testAcc, 2, 'pokeFromSlasher');
-
-    await time.increase(MIN_REPORT_INTERVAL);
+    //
+    // await poke(testAcc, 2, 'pokeFromSlasher');
+    //
+    // await time.increase(MIN_REPORT_INTERVAL);
 
     const res = await oracle.slasherHeartbeat(2, {from: testAcc});
     console.log('\n\nslasherHeartbeat reward', fromWei(await powerPoke.rewards(2)));
