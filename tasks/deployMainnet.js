@@ -39,7 +39,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const MAX_REPORT_INTERVAL = 3600;
     const STAKE_CHANGE_INTERVAL = MAX_REPORT_INTERVAL;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
-    const MIN_SLASHING_DEPOSIT = ether(40); //TODO: what deposit for mainnet
+    const MIN_SLASHING_DEPOSIT = ether(5000);
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const SLASHER_REWARD_PCT = '0';//ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
