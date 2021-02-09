@@ -9,6 +9,7 @@ const StubOracle = artifacts.require('StubOracle');
 const MockOracle = artifacts.require('MockOracle');
 const PowerPoke = artifacts.require('PowerPoke');
 const MockFastGasOracle = artifacts.require('MockFastGasOracle');
+const MockProxyCall = artifacts.require('MockProxyCall');
 
 const { expect } = chai;
 
@@ -68,12 +69,14 @@ describe('PowerOracle', function () {
   let cvpToken;
   let fastGasOracle;
   let powerPokeOpts;
+  let proxyCall;
 
   let deployer, owner, oracleClientOwner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink, uniswapRouter;
 
   before(async function() {
     [deployer, owner, oracleClientOwner, reservoir, alice, bob, validReporterPoker, validSlasherPoker, sink, uniswapRouter] = await web3.eth.getAccounts();
     fastGasOracle = await MockFastGasOracle.new(gwei(300 * 1000));
+    proxyCall = await MockProxyCall.new();
 
     powerPokeOpts = web3.eth.abi.encodeParameter(
       {
@@ -167,6 +170,13 @@ describe('PowerOracle', function () {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(1, ['REP'], powerPokeOpts, { from: validReporterPoker }))
         .to.be.revertedWith('PAUSED');
+    });
+
+    it('should deny poking from a contract', async function() {
+      await staking.mockSetUser(2, bob, proxyCall.address, ether(400));
+      await staking.setHDH(2);
+      const data = oracle.contract.methods.pokeFromReporter(2, ['REP'], powerPokeOpts).encodeABI();
+      await expect(proxyCall.makeCall(oracle.address, data)).to.be.revertedWith('CONTRACT_CALL');
     });
 
     describe('rewards', () => {
@@ -557,6 +567,18 @@ describe('PowerOracle', function () {
       await oracle.pause({ from: owner });
       await expect(oracle.slasherHeartbeat(2, { from: validSlasherPoker }))
         .to.be.revertedWith('PAUSED');
+    });
+
+    it('should deny poking from a contract', async function() {
+      await staking.mockSetUser(2, bob, proxyCall.address, ether(400));
+      const data = oracle.contract.methods.pokeFromSlasher(2, ['REP'], powerPokeOpts).encodeABI();
+      await expect(proxyCall.makeCall(oracle.address, data)).to.be.revertedWith('CONTRACT_CALL');
+    });
+
+    it('should deny heartbeat from a contract', async function() {
+      await staking.mockSetUser(2, bob, proxyCall.address, ether(400));
+      const data = oracle.contract.methods.slasherHeartbeat(2).encodeABI();
+      await expect(proxyCall.makeCall(oracle.address, data)).to.be.revertedWith('CONTRACT_CALL');
     });
   });
 

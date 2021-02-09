@@ -48,6 +48,11 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     powerPoke.reward(reporterId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
   }
 
+  modifier denyContract() {
+    require(msg.sender == tx.origin, "CONTRACT_CALL");
+    _;
+  }
+
   constructor(
     address cvpToken_,
     uint256 anchorPeriod_,
@@ -136,7 +141,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 reporterId_,
     string[] memory symbols_,
     bytes calldata rewardOpts
-  ) external override onlyReporter(reporterId_, rewardOpts) whenNotPaused {
+  ) external override onlyReporter(reporterId_, rewardOpts) whenNotPaused denyContract {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -167,7 +172,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 slasherId_,
     string[] memory symbols_,
     bytes calldata rewardOpts
-  ) external override whenNotPaused {
+  ) external override whenNotPaused denyContract {
     uint256 gasStart = gasleft();
     powerPoke.authorizeNonReporter(slasherId_, msg.sender);
     uint256 len = symbols_.length;
@@ -202,7 +207,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     emit PokeFromSlasher(slasherId_, len, overdueCount);
   }
 
-  function slasherHeartbeat(uint256 slasherId_) external override whenNotPaused {
+  function slasherHeartbeat(uint256 slasherId_) external override whenNotPaused denyContract {
     uint256 gasStart = gasleft();
     powerPoke.authorizeNonReporter(slasherId_, msg.sender);
 
