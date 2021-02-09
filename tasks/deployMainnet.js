@@ -56,6 +56,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
 
     console.log('Deployer address is', deployer);
 
+    console.log('ETH before', web3.utils.fromWei(await web3.eth.getBalance(deployer)));
     console.log('>>> Deploying PowerOracleStaking...');
     const staking = await deployProxied(
       PowerPokeStaking,
@@ -93,7 +94,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await powerPoke.addClient(oracle.address, deployer, false, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
     await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS);
-    await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_HEARTBEAT_NUMERATOR, BONUS_HEARTBEAT_DENUMERATOR, PER_GAS);
+    // await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_HEARTBEAT_NUMERATOR, BONUS_HEARTBEAT_DENUMERATOR, PER_GAS);
     await powerPoke.setSlasherHeartbeat(oracle.address, MIN_REPORT_INTERVAL);
     await powerPoke.setFixedCompensations(oracle.address, 260000, 99000);
 
@@ -101,6 +102,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await staking.transferOwnership(OWNER);
     await powerPoke.transferOwnership(OWNER);
     await powerPoke.transferClientOwnership(oracle.address, OWNER);
+    console.log('ETH after', web3.utils.fromWei(await web3.eth.getBalance(deployer)));
 
     console.log('Done');
 
