@@ -38,7 +38,9 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     // In seconds
     const MAX_REPORT_INTERVAL = 3600;
     // In order to act as a slasher, a user should keep their deposit >= MIN_SLASHING_DEPOSIT
-    const MIN_SLASHING_DEPOSIT = ether(40);
+    const MIN_SLASHING_DEPOSIT = ether(40); //TODO: what deposit for mainnet
+    //gasUsed without ETH: 99339
+    //gasUsed with ETH: 267998
     // A slasher reward in pct to the reporter deposit. Is multiplied to the outdated token count.
     const SLASHER_REWARD_PCT = '0';//ether('0.015');
     // The protocol reward in pct to the reporter deposit. Is multiplied to the outdated token count.
@@ -75,7 +77,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('>>> PowerPoke (proxy) deployed at', powerPoke.address);
     console.log('>>> PowerPoke implementation deployed at', powerPoke.initialImplementation.address);
 
-    await staking.setSlasher(powerPoke.address);
+    // await staking.setSlasher(powerPoke.address);
 
     console.log('>>> Deploying PowerOracle...');
     const oracle = await deployProxied(
@@ -90,7 +92,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('>>> Setting powerOracle address in powerOracleStaking');
     await powerPoke.setOracle(oracle.address);
 
-    await powerPoke.addClient(oracle.address, deployer, true, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
+    await powerPoke.addClient(oracle.address, deployer, false, MAX_GAS_PRICE, MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL);
     await powerPoke.setMinimalDeposit(oracle.address, MIN_SLASHING_DEPOSIT);
     await powerPoke.setBonusPlan(oracle.address, '1', true, BONUS_NUMERATOR, BONUS_DENUMERATOR, PER_GAS);
     await powerPoke.setBonusPlan(oracle.address, '2', true, BONUS_HEARTBEAT_NUMERATOR, BONUS_HEARTBEAT_DENUMERATOR, PER_GAS);
@@ -133,6 +135,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     await time.increase(MIN_REPORT_INTERVAL);
 
     await staking.executeDeposit('1',{from: deployer});
+    let pokeCount = 0;
 
     await poke(deployer, 1);
 
@@ -165,13 +168,14 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     console.log('slasherHeartbeat gasUsed', res.receipt.gasUsed);
 
     async function poke(from, pokerId, pokeFunc = 'pokeFromReporter') {
-      let {testAddress, testOpts} = await generateTestWalletAndCompensateOpts(web3, ethers);
+      let {testAddress, testOpts} = await generateTestWalletAndCompensateOpts(web3, ethers, pokeCount === 1);
       console.log('\n>>> Making the ' + pokeFunc);
       const pokeOptions = {from, gasPrice: gwei('100')};
       // console.log('getGasPriceFor', fromWei(await powerPoke.contract.methods.getGasPriceFor(oracle.address).call(pokeOptions), 'gwei'));
 
-      let res = await oracle[pokeFunc](pokerId, symbolsToPoke, testOpts, pokeOptions)
+      let res = await oracle[pokeFunc](pokerId, symbolsToPoke,testOpts, pokeOptions)
 
+      pokeCount++;
       const ethUsedByPoke = await ethUsed(web3, res.receipt);
       console.log('gasUsed', res.receipt.gasUsed);
       console.log('ethUsed', ethUsedByPoke);
@@ -185,7 +189,7 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     }
   });
 
-async function generateTestWalletAndCompensateOpts(web3, ethers) {
+async function generateTestWalletAndCompensateOpts(web3, ethers, compensateInETH = true) {
   const testWallet = ethers.Wallet.createRandom();
   const powerPokeOpts = web3.eth.abi.encodeParameter(
     {
@@ -196,7 +200,7 @@ async function generateTestWalletAndCompensateOpts(web3, ethers) {
     },
     {
       to: testWallet.address,
-      compensateInETH: true
+      compensateInETH
     },
   );
   return {
