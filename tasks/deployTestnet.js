@@ -9,8 +9,8 @@ task('deploy-testnet', 'Deploys testnet contracts')
     const { getTokenConfigs } = require('../test/localHelpers');
     const { constants } = require('@openzeppelin/test-helpers');
 
-    const REPORT_REWARD_IN_ETH = ether('0.05');
-    const MAX_CVP_REWARD = ether(15);
+    // const REPORT_REWARD_IN_ETH = ether('0.05');
+    // const MAX_CVP_REWARD = ether(15);
     const ANCHOR_PERIOD = 30;
     const MIN_REPORT_INTERVAL = 60;
     const MAX_REPORT_INTERVAL = 90;
@@ -74,8 +74,8 @@ task('deploy-testnet', 'Deploys testnet contracts')
     if(POOL_ADDRESS) {
       const IUniswapV2Factory = artifacts.require('IUniswapV2Factory');
       const IERC20 = artifacts.require('IERC20Detailed');
-      const BPool = artifacts.require('BPoolInterface');
-      const bpool = await BPool.at(POOL_ADDRESS);
+      // const BPool = artifacts.require('BPoolInterface');
+      // const bpool = await BPool.at(POOL_ADDRESS);
       const uniswapFactory = await IUniswapV2Factory.at('0x4b2387242d2E1415A7Ce9ee584082d4B9d796061');
       const wethAddress = '0xed0F538448Cc27B1deF57feAc43201C79e6bDCf7';
       const usdcAddress = '0xdbb2b2550bd5f6091756ed9bb674388283d42bf4';

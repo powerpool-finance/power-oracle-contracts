@@ -45,8 +45,8 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
     const RESERVOIR_REWARD_PCT = '0';//ether('0.005');
     const BONUS_NUMERATOR = '7610350076';
     const BONUS_DENUMERATOR = '10000000000000000';
-    const BONUS_HEARTBEAT_NUMERATOR = '0';
-    const BONUS_HEARTBEAT_DENUMERATOR = '1800000000000000';
+    // const BONUS_HEARTBEAT_NUMERATOR = '0';
+    // const BONUS_HEARTBEAT_DENUMERATOR = '1800000000000000';
     const PER_GAS = '10000';
     const MAX_GAS_PRICE = gwei(500);
 
