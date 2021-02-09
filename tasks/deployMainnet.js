@@ -63,7 +63,10 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerPokeStaking,
       [cvpAddress],
       [deployer, RESERVOIR, constants.ZERO_ADDRESS, SLASHER_REWARD_PCT, RESERVOIR_REWARD_PCT, STAKE_CHANGE_INTERVAL, STAKE_CHANGE_INTERVAL],
-      { proxyAdminOwner: PROXY_OWNER }
+      {
+        proxyAdminOwner: PROXY_OWNER,
+        implementation: ''
+      }
     );
     console.log('>>> PowerOracleStaking (proxy) deployed at', staking.address);
     console.log('>>> PowerOracleStaking implementation deployed at', staking.initialImplementation.address);
@@ -72,7 +75,10 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerPoke,
       [cvpAddress, wethAddress, gasPriceOracle, uniswapRouterAddress, staking.address],
       [deployer, constants.ZERO_ADDRESS],
-      { proxyAdminOwner: PROXY_OWNER }
+      {
+        proxyAdminOwner: PROXY_OWNER,
+        implementation: ''
+      }
     );
     console.log('>>> PowerPoke (proxy) deployed at', powerPoke.address);
     console.log('>>> PowerPoke implementation deployed at', powerPoke.initialImplementation.address);
@@ -84,7 +90,10 @@ task('deploy-mainnet', 'Deploys mainnet contracts')
       PowerOracle,
       [cvpAddress, ANCHOR_PERIOD, configs],
       [OWNER, powerPoke.address],
-      { proxyAdminOwner: PROXY_OWNER }
+      {
+        proxyAdminOwner: PROXY_OWNER,
+        implementation: ''
+      }
     );
     console.log('>>> PowerOracle (proxy) deployed at', oracle.address);
     console.log('>>> PowerOracle implementation deployed at', oracle.initialImplementation.address);

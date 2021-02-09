@@ -134,6 +134,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     await cvpToken.approve(oracle.address, 10000);
 
     console.log('>>> Making the initial poke');
+    console.log('tokensSymbols', tokensSymbols)
     await oracle.poke(tokensSymbols);
 
     console.log('Done');

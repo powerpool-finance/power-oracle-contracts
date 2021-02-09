@@ -35,7 +35,7 @@ async function deployProxied(
   initializerArgs = [],
   opts = {}
 ) {
-  const impl = await contract.new(...constructorArgs);
+  const impl = opts.implementation ? await contract.at(opts.implementation) : await contract.new(...constructorArgs);
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
   const data = getInitializerData(impl, initializerArgs, opts.initializer);
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
