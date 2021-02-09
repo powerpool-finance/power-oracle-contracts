@@ -3,6 +3,7 @@
 build/
 dist/
 node_modules/
+contracts/lib/FixedPoint.sol
 contracts/UniswapTWAPProvider.sol
 contracts/Uniswap/UniswapConfig.sol
 contracts/Uniswap/UniswapLib.sol

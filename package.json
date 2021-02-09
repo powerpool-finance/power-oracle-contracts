@@ -20,18 +20,21 @@
     "@openzeppelin/test-helpers": "^0.5.6",
     "@openzeppelin/truffle-upgrades": "^1.0.2",
     "@powerpool/hardhat-ganache": "^2.0.0",
-    "hardhat": "^2.0.3",
-    "hardhat-contract-sizer": "^2.0.0",
-    "hardhat-gas-reporter": "^1.0.1",
-    "@typechain/ethers-v5": "^2.0.0",
+    "@typechain/ethers-v5": "^5.0.0",
+    "bignumber.js": "^9.0.1",
     "chai": "^4.2.0",
     "dotenv": "^8.2.0",
     "eslint": "^7.4.0",
-    "eslint-config-prettier": "^6.11.0",
+    "eslint-config-prettier": "^7.2.0",
     "ethereum-waffle": "^3.1.0",
     "ethers": "^5.0.13",
     "fs-extra": "^9.0.1",
+    "hardhat": "^2.0.3",
+    "hardhat-contract-sizer": "^2.0.0",
+    "hardhat-gas-reporter": "^1.0.1",
+    "lodash": "^4.17.20",
     "mocha": "^8.0.1",
+    "p-iteration": "^1.1.8",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "^1.0.0-alpha.54",
     "shelljs": "^0.8.4",
@@ -40,7 +43,7 @@
     "solhint": "^3.0.0",
     "solhint-plugin-prettier": "^0.0.5",
     "solidity-coverage": "^0.7.11",
-    "typechain": "^3.0.0"
+    "typechain": "^4.0.0"
   },
   "files": [
     "/contracts"
@@ -67,13 +70,13 @@
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --network coverage --temp artifacts --testfiles \"./test/**/*.js\"",
     "deploy:testnet:local": "hardhat deploy-testnet --network local",
     "deploy:testnet:kovan": "hardhat deploy-testnet --network kovan",
-    "lint:sol": "solhint --config ./.solhint.json --max-warnings 0 \"contracts/**/*.sol\"",
+    "lint:sol": "solhint --config ./.solhint.json \"contracts/**/*.sol\"",
     "lint:js": "eslint --config .eslintrc.json --ignore-path ./.eslintignore --ext .js .",
     "node": "hardhat node",
     "prettier": "prettier --config .prettierrc --write \"**/*.{js,json,md,sol,ts}\"",
     "prettier:sol": "prettier --config .prettierrc --write \"contracts/**/*.sol\"",
     "prettier:list-different": "prettier --config .prettierrc --list-different \"**/*.{js,json,md,sol,ts}\"",
-    "test": "mocha --timeout 20000",
+    "test": "hardhat test --no-compile",
     "test:local": "hardhat test --network local",
     "pairs": "builder pair-details --network mainnet",
     "report:size": "hardhat size-contracts",
@@ -81,8 +84,6 @@
     "typechain": "hardhat typechain"
   },
   "dependencies": {
-    "bignumber.js": "^9.0.1",
-    "lodash": "^4.17.20",
-    "p-iteration": "^1.1.8"
+    "hardhat-typechain": "^0.3.4"
   }
 }

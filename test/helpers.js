@@ -181,7 +181,7 @@ function kether(v) {
 }
 
 function address(n) {
-  return `0x${n.toString(16).padStart(40, '0')}`;
+  return web3.utils.toChecksumAddress(`0x${n.toString(16).padStart(40, '0')}`);
 }
 
 function keccak256(str) {
@@ -194,6 +194,14 @@ function uint256(int) {
 
 function uint(n) {
   return web3.utils.toBN(n).toString();
+}
+
+function toInt(n) {
+  return parseInt(n, 10);
+}
+
+function strSum(a, b) {
+  return String(toInt(a) + toInt(b));
 }
 
 const fixed = num => {
@@ -247,6 +255,8 @@ module.exports = {
   keccak256,
   uint256,
   uint,
+  toInt,
+  strSum,
   fixed,
   forkContractUpgrade,
   deployAndSaveArgs,
