@@ -132,6 +132,11 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
 
   /*** Pokers ***/
 
+  struct PokeFromReporterHelperStruct {
+    uint256 len;
+    uint256 ethPrice;
+  }
+
   /**
    * @notice A reporter pokes symbols with incentive to be rewarded
    * @param reporterId_ The valid reporter's user ID
@@ -142,25 +147,36 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     string[] memory symbols_,
     bytes calldata rewardOpts
   ) external override onlyReporter(reporterId_, rewardOpts) whenNotPaused denyContract {
-    uint256 len = symbols_.length;
-    require(len > 0, "MISSING_SYMBOLS");
+    PokeFromReporterHelperStruct memory helper;
 
-    uint256 ethPrice = _fetchEthPrice();
-    _fetchCvpPrice(ethPrice);
+    helper.len = symbols_.length;
+    require(helper.len > 0, "MISSING_SYMBOLS");
+
+    helper.ethPrice = _fetchEthPrice();
+    _fetchCvpPrice(helper.ethPrice);
     uint256 rewardCount = 0;
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
 
-    for (uint256 i = 0; i < len; i++) {
+    bool[maxTokens] memory handled;
+    handled[getSymbolHashIndex(ethHash)] = true;
+    handled[getSymbolHashIndex(cvpHash)] = true;
+
+    for (uint256 i = 0; i < helper.len; i++) {
+      uint256 symbolIndex = getSymbolHashIndex(keccak256(abi.encodePacked(symbols_[i])));
       if (
-        _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) != ReportInterval.LESS_THAN_MIN
+        _fetchAndSavePrice(symbols_[i], helper.ethPrice, minReportInterval, maxReportInterval) !=
+        ReportInterval.LESS_THAN_MIN
       ) {
         rewardCount++;
+      } else {
+        require(handled[symbolIndex] == false, "INTERNAL_OR_DUPLICATED_SYMBOL");
       }
+      handled[symbolIndex] = true;
     }
 
     require(rewardCount > 0, "NOTHING_UPDATED");
 
-    emit PokeFromReporter(reporterId_, len, rewardCount);
+    emit PokeFromReporter(reporterId_, helper.len, rewardCount);
   }
 
   /**
@@ -183,13 +199,21 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 overdueCount = 0;
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
 
+    bool[maxTokens] memory handled;
+    handled[getSymbolHashIndex(ethHash)] = true;
+    handled[getSymbolHashIndex(cvpHash)] = true;
+
     for (uint256 i = 0; i < len; i++) {
+      uint256 symbolIndex = getSymbolHashIndex(keccak256(abi.encodePacked(symbols_[i])));
       if (
         _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) ==
         ReportInterval.GREATER_THAN_MAX
       ) {
         overdueCount++;
+      } else {
+        require(handled[symbolIndex] == false, "INTERNAL_OR_DUPLICATED_SYMBOL");
       }
+      handled[symbolIndex] = true;
     }
 
     // update with no constraints, compensate & reward
