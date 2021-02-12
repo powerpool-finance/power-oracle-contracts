@@ -1,5 +1,5 @@
 const { time, expectEvent } = require('@openzeppelin/test-helpers');
-const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
+const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
 const { getTokenConfigs } = require('./localHelpers');
 
 const chai = require('chai');
