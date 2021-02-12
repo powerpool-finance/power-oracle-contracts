@@ -148,7 +148,6 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     string[] memory symbols_,
     bytes calldata rewardOpts_
   ) external override onlyReporter(reporterId_, rewardOpts_) onlyEOA whenNotPaused {
-
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
@@ -159,8 +158,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
 
     for (uint256 i = 0; i < len; i++) {
       require(
-        _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) !=
-          ReportInterval.LESS_THAN_MIN,
+        _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) != ReportInterval.LESS_THAN_MIN,
         "TOO_EARLY_UPDATE"
       );
     }
@@ -178,7 +176,6 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     string[] memory symbols_,
     bytes calldata rewardOpts_
   ) external override onlySlasher(slasherId_, rewardOpts_) onlyEOA whenNotPaused {
-
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
