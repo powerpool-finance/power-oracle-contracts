@@ -14,7 +14,7 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
     const { web3 } = PowerOracle;
     // const [deployer] = await web3.eth.getAccounts();
 
-    const proxyAddress = '0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB';
+    const proxyAddress = '0x50f8D7f4db16AA926497993F020364f739EDb988';
     const oracle = await PowerOracle.at(proxyAddress);
     const numTokens = await oracle.numTokens();
     console.log('numTokens', numTokens);
@@ -23,10 +23,10 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
       configs[i] = _.pick(await oracle.getTokenConfig(i), ['cToken', 'underlying', 'symbolHash', 'baseUnit', 'priceSource', 'fixedPrice', 'uniswapMarket', 'isUniswapReversed']);
     }
 
-    configs = configs.filter(p => p.underlying.toLowerCase() !== '0x80fb784b7ed66730e8b1dbd9820afd29931aab03');
+    // configs = configs.filter(p => p.underlying.toLowerCase() !== '0x80fb784b7ed66730e8b1dbd9820afd29931aab03');
 
     const addPairs = [
-      {market: '0x2e81ec0b8b4022fac83a21b2f2b4b8f5ed744d70', token: '0xc944e90c64b2c07662a292be6244bdf05cda44a7', symbol: keccak256('GRT'), isUniswapReversed: true}
+      // {market: '0x2e81ec0b8b4022fac83a21b2f2b4b8f5ed744d70', token: '0xc944e90c64b2c07662a292be6244bdf05cda44a7', symbol: keccak256('GRT'), isUniswapReversed: true}
     ];
     await pIteration.forEachSeries(addPairs, (pair) => {
       configs.push({
@@ -42,10 +42,10 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
     });
     console.log('configs', configs.length);
 
-    const cvpToken = await oracle.cvpToken();
-    const reservoir = await oracle.reservoir();
+    const cvpToken = await oracle.CVP_TOKEN();
     const anchorPeriod = await oracle.anchorPeriod();
-    const newImpl = await deployAndSaveArgs(PowerOracle, [cvpToken, reservoir, anchorPeriod, configs]);
+    console.log('anchorPeriod before', anchorPeriod);
+    const newImpl = await deployAndSaveArgs(PowerOracle, [cvpToken, anchorPeriod, configs]);
     console.log('newImpl', newImpl.address);
 
     const networkId = await web3.eth.net.getId();
@@ -60,6 +60,8 @@ task('redeploy-oracle-implementation', 'Redeploy oracle implementation')
       '0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB',
       newImpl.address
     );
+
+    console.log('anchorPeriod after', await oracle.anchorPeriod());
 
     const symbols = ['GRT', 'YFI', 'COMP', 'CVP', 'SNX', 'wNXM', 'MKR', 'UNI', 'UMA', 'AAVE', 'DAI', 'SUSHI', 'CREAM', 'AKRO', 'COVER', 'KP3R', 'PICKLE'];
 
