@@ -39,14 +39,14 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('Deployer address is', deployer);
 
     console.log('>>> Deploying CVP token...');
-    const cvpToken = await MockCVP.new(ether(2e9));
+    const cvpToken = await MockCVP.at('0xc7ee325C2F3aDAC5256D38A55A0d1374B9c6f87B');
     console.log('>>> CVP Token deployed at', cvpToken.address);
 
     const mockWeth = await MockWETH.new();
     const uniswapRouter = mockWeth;
     const mockFastOracle = await MockFastGasOracle.new(gwei(2));
 
-    console.log('>>> Deploying PowerPokeStaking...');
+    console.log('\n>>> Deploying PowerPokeStaking...');
     const staking = await deployProxied(
       PowerPokeStaking,
       [cvpToken.address],
@@ -56,7 +56,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
     console.log('>>> PowerPokeStaking (proxy) deployed at', staking.address);
     console.log('>>> PowerPokeStaking implementation deployed at', staking.initialImplementation.address);
 
-    console.log('>>> Deploying PowerPoke...');
+    console.log('\n>>> Deploying PowerPoke...');
     const powerPoke = await deployProxied(
       PowerPoke,
       [cvpToken.address, mockWeth.address, mockFastOracle.address, uniswapRouter.address, staking.address],
@@ -68,7 +68,7 @@ task('deploy-testnet', 'Deploys testnet contracts')
 
     await staking.setSlasher(powerPoke.address);
 
-    console.log('>>> Deploying PowerOracle...');
+    console.log('\n>>> Deploying PowerOracle...');
     let oracle;
     let tokensSymbols = [];
     if(POOL_ADDRESS) {

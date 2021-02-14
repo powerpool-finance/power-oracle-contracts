@@ -24,7 +24,7 @@ function getAccounts(network) {
   return [_.trim('0x' + fs.readFileSync(fileName, {encoding: 'utf8'}))];
 }
 
-const gasLimit = 12 * 10 ** 6;
+const gasLimit = 3.5 * 10 ** 6;
 
 const config = {
   analytics: {
@@ -50,9 +50,10 @@ const config = {
     },
     mainnet: {
       url: 'https://mainnet-eth.compound.finance',
-      gasPrice: 81 * 10 ** 9,
+      gasPrice: 170 * 10 ** 9,
       gasMultiplier: 1.5,
       accounts: getAccounts('mainnet'),
+      timeout: 20000000,
       gas: gasLimit,
       blockGasLimit: gasLimit
     },
@@ -67,11 +68,11 @@ const config = {
     mainnetfork: {
       url: 'http://127.0.0.1:8545/',
       // accounts: getAccounts('mainnet'),
-      gasPrice: 150 * 10 ** 9,
+      gasPrice: 170 * 10 ** 9,
       gasMultiplier: 1.5,
       timeout: 2000000,
       gas: gasLimit,
-      blockGasLimit: gasLimit,
+      blockGasLimit: gasLimit
     },
     local: {
       url: 'http://127.0.0.1:8545',
