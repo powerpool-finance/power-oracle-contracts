@@ -1,5 +1,5 @@
 const { time, expectEvent } = require('@openzeppelin/test-helpers');
-const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256, fetchLogs } = require('./helpers');
+const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
 const { getTokenConfigs } = require('./localHelpers');
 
 const chai = require('chai');
@@ -143,12 +143,30 @@ describe('PowerOracle', function () {
     });
 
     it('should allow a valid reporter calling the method', async function() {
-      await oracle.pokeFromReporter(1, ['CVP', 'REP'], powerPokeOpts, { from: validReporterPoker });
+      await oracle.pokeFromReporter(1, ['DAI', 'REP'], powerPokeOpts, { from: validReporterPoker });
     });
 
     it('should deny another user calling an behalf of reporter', async function() {
-      await expect(oracle.pokeFromReporter(1, ['CVP', 'REP'], powerPokeOpts, { from: bob }))
+      await expect(oracle.pokeFromReporter(1, ['DAI', 'REP'], powerPokeOpts, { from: bob }))
         .to.be.revertedWith('INVALID_POKER_KEY');
+    });
+
+    it('should deny poking with duplicated symbols', async function() {
+      await expect(oracle.pokeFromReporter(1, ['DAI', 'REP', 'BTC', 'DAI'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
+      await expect(oracle.pokeFromReporter(1, ['REP', 'REP'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
+    });
+
+    it('should deny poking with internal symbols', async function() {
+      await expect(oracle.pokeFromReporter(1, ['DAI', 'REP', 'ETH', 'DAI'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
+      await expect(oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
+      await expect(oracle.pokeFromReporter(1, ['CVP'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
+      await expect(oracle.pokeFromReporter(1, ['ETH'], powerPokeOpts, { from: validReporterPoker }))
+        .to.be.revertedWith('TOO_EARLY_UPDATE');
     });
 
     it('should deny calling with an empty array', async function() {
@@ -224,7 +242,6 @@ describe('PowerOracle', function () {
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '2',
-          rewardCount: '2'
         });
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           userId: '1',
@@ -234,18 +251,17 @@ describe('PowerOracle', function () {
         });
       });
 
-      it('should revert if there is no token updated', async function() {
-        await oracle.pokeFromReporter(1, ['CVP', 'REP'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
+      it('should revert if there is nothing to update', async function() {
+        await oracle.pokeFromReporter(1, ['DAI', 'REP'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
         await time.increase(10);
-        // expect(await poke.rewards(1)).to.be.equal(ether('0.8464'));
 
-        await expect(oracle.pokeFromReporter(1, ['CVP', 'REP'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) }))
-          .to.be.revertedWith('NOTHING_UPDATED');
+        await expect(oracle.pokeFromReporter(1, ['DAI', 'REP'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) }))
+          .to.be.revertedWith('TOO_EARLY_UPDATE');
       });
 
       it('should partially update on partially outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
+        let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
         const firstTimestamp = await getResTimestamp(res);
         // expect(await poke.rewards(1)).to.be.equal(ether('2.823133703013698630'));
 
@@ -278,7 +294,6 @@ describe('PowerOracle', function () {
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '3',
-          rewardCount: '3'
         });
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           userId: '1',
@@ -290,7 +305,7 @@ describe('PowerOracle', function () {
 
       it('should fully update on fully outdated prices', async function() {
         // 1st poke
-        let res = await oracle.pokeFromReporter(1, ['CVP', 'REP', 'DAI', 'BTC'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
+        let res = await oracle.pokeFromReporter(1, ['REP', 'DAI', 'BTC'], powerPokeOpts, { from: validReporterPoker, gasPrice: gwei(35) });
         const firstTimestamp = await getResTimestamp(res);
         // expect(await poke.rewards(1)).to.be.equal(ether('2.361699730410958904'));
 
@@ -321,7 +336,6 @@ describe('PowerOracle', function () {
         expectEvent(res, 'PokeFromReporter', {
           reporterId: '1',
           tokenCount: '3',
-          rewardCount: '3'
         });
         await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
           client: oracle.address,
@@ -387,7 +401,6 @@ describe('PowerOracle', function () {
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
         tokenCount: '3',
-        overdueCount: '3'
       });
       await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
         client: oracle.address,
@@ -432,7 +445,11 @@ describe('PowerOracle', function () {
       });
 
       // 3rd poke
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], powerPokeOpts, {
+      await expect(oracle.pokeFromSlasher(2, ['REP', 'DAI', 'BTC'], powerPokeOpts, {
+        from: validSlasherPoker,
+        gasPrice: gwei(35),
+      })).to.be.revertedWith('INTERVAL_IS_OK');
+      res = await oracle.pokeFromSlasher(2, ['DAI', 'BTC'], powerPokeOpts, {
         from: validSlasherPoker,
         gasPrice: gwei(35),
       });
@@ -441,8 +458,7 @@ describe('PowerOracle', function () {
       expectEvent.notEmitted(res, 'RewardUserSlasherUpdate');
       expectEvent(res, 'PokeFromSlasher', {
         slasherId: '2',
-        tokenCount: '4',
-        overdueCount: '2'
+        tokenCount: '2',
       });
       expectEvent(res, 'SlasherHeartbeat', {
         slasherId: '2',
@@ -472,7 +488,7 @@ describe('PowerOracle', function () {
       });
     });
 
-    it('should not call PowerPokeStaking.slash() method if there are no prices outdated', async function() {
+    it('should revert if there are no prices outdated', async function() {
       await oracle.mockSetAnchorPrice('ETH', mwei('320'));
       await oracle.mockSetAnchorPrice('CVP', mwei('5'));
       // 1st poke
@@ -480,30 +496,15 @@ describe('PowerOracle', function () {
       await time.increase(5);
 
       // 2nd poke
-      let res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) });
-      const secondTimestamp = await getResTimestamp(res);
-
-      expectEvent(res, 'PokeFromSlasher', {
-        slasherId: '2',
-        tokenCount: '4',
-        overdueCount: '0'
-      });
-
-      expectEvent(res, 'SlasherHeartbeat', {
-        slasherId: '2',
-      });
-
-      await expectEvent.notEmitted.inTransaction(res.tx, poke, 'RewardUser');
-
-      doNotExpectPriceUpdateEvent({
-        response: res,
-        tokenSymbols: ['ETH', 'CVP', 'REP', 'DAI', 'BTC'],
-        oldTimestamp: '0',
-        newTimestamp: secondTimestamp
-      })
-
-      const logs = await fetchLogs(MockStaking, res);
-      expect(logs.length).to.be.equal(0);
+      await expect(
+        oracle.pokeFromSlasher(2, ['REP'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) }),
+      ).to.be.revertedWith('INTERVAL_IS_OK');
+      await expect(
+        oracle.pokeFromSlasher(2, ['DAI'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) }),
+      ).to.be.revertedWith('INTERVAL_IS_OK');
+      await expect(
+        oracle.pokeFromSlasher(2, ['BTC'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) }),
+      ).to.be.revertedWith('INTERVAL_IS_OK');
     });
 
     it('slasherHeartbeat should works correctly', async function() {
@@ -512,7 +513,7 @@ describe('PowerOracle', function () {
       await time.increase(SLASHER_HEARTBEAT_INTERVAL - 5);
 
       // 2nd poke
-      res = await oracle.pokeFromSlasher(2, ['CVP', 'REP', 'DAI', 'BTC'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) });
+      res = await oracle.pokeFromSlasher(2, ['REP', 'DAI', 'BTC'], powerPokeOpts, { from: validSlasherPoker, gasPrice: gwei(35) });
       const secondTimestamp = await getResTimestamp(res);
 
       expect(await oracle.lastSlasherUpdates(2)).to.be.equal(secondTimestamp);
