@@ -35,7 +35,7 @@ async function deployProxied(
   initializerArgs = [],
   opts = {}
 ) {
-  const impl = await contract.new(...constructorArgs);
+  const impl = opts.implementation ? await contract.at(opts.implementation) : await contract.new(...constructorArgs);
   const adminContract = await createOrGetProxyAdmin(opts.proxyAdminOwner);
   const data = getInitializerData(impl, initializerArgs, opts.initializer);
   const proxy = await AdminUpgradeabilityProxy.new(impl.address, adminContract.address, data);
@@ -81,6 +81,10 @@ function ether(value) {
 
 function tether(value) {
   return web3.utils.toWei(value, 'tether').toString();
+}
+
+function fromWei(value, to = 'ether') {
+  return web3.utils.fromWei(value, to);
 }
 
 function mwei(value) {
@@ -200,6 +204,11 @@ function toInt(n) {
   return parseInt(n, 10);
 }
 
+async function ethUsed(web3, receipt) {
+  const tx = await web3.eth.getTransaction(receipt.transactionHash);
+  return fromWei(new BigNumber(receipt.gasUsed.toString()).multipliedBy(new BigNumber(tx.gasPrice.toString())).toString());
+}
+
 function strSum(a, b) {
   return String(toInt(a) + toInt(b));
 }
@@ -237,11 +246,21 @@ async function deployAndSaveArgs(Contract, args) {
   return newInstance;
 }
 
+async function impersonateAccount(ethers, adminAddress) {
+  await ethers.provider.getSigner().sendTransaction({
+    to: adminAddress,
+    value: '0x' + new BigNumber(ether('1')).toString(16)
+  })
+
+  await ethers.provider.send('hardhat_impersonateAccount', [adminAddress]);
+}
+
 module.exports = {
   advanceBlocks,
   createOrGetProxyAdmin,
   deployProxied,
   ether,
+  fromWei,
   mwei,
   gwei,
   tether,
@@ -258,7 +277,9 @@ module.exports = {
   toInt,
   strSum,
   fixed,
+  ethUsed,
   forkContractUpgrade,
   deployAndSaveArgs,
-  increaseTime
+  increaseTime,
+  impersonateAccount
 }
