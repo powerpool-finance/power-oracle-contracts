@@ -10,7 +10,7 @@ contract PowerPokeStorageV1 {
   struct Client {
     bool active;
     bool canSlash;
-    bool allowPokerWithdrawingRewards;
+    bool _deprecated;
     address owner;
     uint256 credit;
     uint256 minReportInterval;
