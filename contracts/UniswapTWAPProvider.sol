@@ -20,7 +20,6 @@ abstract contract UniswapTWAPProvider is PowerOracleStorageV1, UniswapConfig {
 
   bytes32 internal constant cvpHash = keccak256(abi.encodePacked("CVP"));
   bytes32 internal constant ethHash = keccak256(abi.encodePacked("ETH"));
-  bytes32 internal constant rotateHash = keccak256(abi.encodePacked("rotate"));
 
   /// @notice The event emitted when anchor price is updated
   event AnchorPriceUpdated(string symbol, bytes32 indexed symbolHash, uint anchorPrice, uint oldTimestamp, uint newTimestamp);

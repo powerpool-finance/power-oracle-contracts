@@ -169,7 +169,6 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
       tokenCount: '2',
-      rewardCount: '2'
     })
 
     await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
@@ -180,7 +179,7 @@ describe('IntegrationTest', function () {
 
     // 2nd Poke
     await expect(oracle.pokeFromReporter(aliceId, ['DAI', 'REP'], powerPokeOpts, { from: alicePoker }))
-      .to.be.revertedWith('NOTHING_UPDATED')
+      .to.be.revertedWith('TOO_EARLY_UPDATE')
 
     await time.increase(65);
 
@@ -190,7 +189,6 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromReporter', {
       reporterId: '1',
       tokenCount: '2',
-      rewardCount: '2'
     })
 
     await expectEvent.inTransaction(res.tx, poke, 'RewardUser', {
@@ -200,7 +198,7 @@ describe('IntegrationTest', function () {
 
     // 4th Poke from Slasher which fails
     await expect(oracle.pokeFromSlasher(bobId, ['DAI', 'REP'], powerPokeOpts, { from: bobPoker }))
-      .to.be.revertedWith('BELOW_HEARTBEAT_INTERVAL');
+      .to.be.revertedWith('INTERVAL_IS_OK');
 
     await time.increase(95);
 
@@ -209,7 +207,6 @@ describe('IntegrationTest', function () {
     expectEvent(res, 'PokeFromSlasher', {
       slasherId: '2',
       tokenCount: '2',
-      overdueCount: '2'
     })
     expect(await staking.getDepositOf(aliceId)).to.be.equal(ether(60));
 

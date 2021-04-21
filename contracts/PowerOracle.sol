@@ -23,10 +23,10 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
   uint256 public constant HUNDRED_PCT = 100 ether;
 
   /// @notice The event emitted when a reporter calls a poke operation
-  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount, uint256 rewardCount);
+  event PokeFromReporter(uint256 indexed reporterId, uint256 tokenCount);
 
   /// @notice The event emitted when a slasher executes poke and slashes the current reporter
-  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount, uint256 overdueCount);
+  event PokeFromSlasher(uint256 indexed slasherId, uint256 tokenCount);
 
   /// @notice The event emitted when an arbitrary user calls poke operation
   event Poke(address indexed poker, uint256 tokenCount);
@@ -44,11 +44,17 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 gasStart = gasleft();
     powerPoke.authorizeReporter(reporterId_, msg.sender);
     _;
-    uint256 gasUsed = gasStart.sub(gasleft());
-    powerPoke.reward(reporterId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
+    powerPoke.reward(reporterId_, gasStart.sub(gasleft()), COMPENSATION_PLAN_1_ID, rewardOpts);
   }
 
-  modifier denyContract() {
+  modifier onlySlasher(uint256 slasherId_, bytes calldata rewardOpts) {
+    uint256 gasStart = gasleft();
+    powerPoke.authorizeNonReporter(slasherId_, msg.sender);
+    _;
+    powerPoke.reward(slasherId_, gasStart.sub(gasleft()), COMPENSATION_PLAN_1_ID, rewardOpts);
+  }
+
+  modifier onlyEOA() {
     require(msg.sender == tx.origin, "CONTRACT_CALL");
     _;
   }
@@ -140,27 +146,24 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
   function pokeFromReporter(
     uint256 reporterId_,
     string[] memory symbols_,
-    bytes calldata rewardOpts
-  ) external override onlyReporter(reporterId_, rewardOpts) whenNotPaused denyContract {
+    bytes calldata rewardOpts_
+  ) external override onlyReporter(reporterId_, rewardOpts_) onlyEOA whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
     uint256 ethPrice = _fetchEthPrice();
     _fetchCvpPrice(ethPrice);
-    uint256 rewardCount = 0;
+
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
 
     for (uint256 i = 0; i < len; i++) {
-      if (
-        _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) != ReportInterval.LESS_THAN_MIN
-      ) {
-        rewardCount++;
-      }
+      require(
+        _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) != ReportInterval.LESS_THAN_MIN,
+        "TOO_EARLY_UPDATE"
+      );
     }
 
-    require(rewardCount > 0, "NOTHING_UPDATED");
-
-    emit PokeFromReporter(reporterId_, len, rewardCount);
+    emit PokeFromReporter(reporterId_, len);
   }
 
   /**
@@ -171,43 +174,31 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
   function pokeFromSlasher(
     uint256 slasherId_,
     string[] memory symbols_,
-    bytes calldata rewardOpts
-  ) external override whenNotPaused denyContract {
-    uint256 gasStart = gasleft();
-    powerPoke.authorizeNonReporter(slasherId_, msg.sender);
+    bytes calldata rewardOpts_
+  ) external override onlySlasher(slasherId_, rewardOpts_) onlyEOA whenNotPaused {
     uint256 len = symbols_.length;
     require(len > 0, "MISSING_SYMBOLS");
 
     uint256 ethPrice = _fetchEthPrice();
     _fetchCvpPrice(ethPrice);
-    uint256 overdueCount = 0;
+
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
 
     for (uint256 i = 0; i < len; i++) {
-      if (
+      require(
         _fetchAndSavePrice(symbols_[i], ethPrice, minReportInterval, maxReportInterval) ==
-        ReportInterval.GREATER_THAN_MAX
-      ) {
-        overdueCount++;
-      }
+          ReportInterval.GREATER_THAN_MAX,
+        "INTERVAL_IS_OK"
+      );
     }
 
-    // update with no constraints, compensate & reward
-    if (overdueCount > 0) {
-      _updateSlasherTimestamp(slasherId_, false);
-      powerPoke.slashReporter(slasherId_, overdueCount);
+    _updateSlasherTimestamp(slasherId_, false);
+    powerPoke.slashReporter(slasherId_, len);
 
-      uint256 gasUsed = gasStart.sub(gasleft());
-      powerPoke.reward(slasherId_, gasUsed, COMPENSATION_PLAN_1_ID, rewardOpts);
-    } else {
-      // treat it as a slasherHeartbeat call, do neither compensate nor reward
-      _updateSlasherTimestamp(slasherId_, true);
-    }
-
-    emit PokeFromSlasher(slasherId_, len, overdueCount);
+    emit PokeFromSlasher(slasherId_, len);
   }
 
-  function slasherHeartbeat(uint256 slasherId_) external override whenNotPaused denyContract {
+  function slasherHeartbeat(uint256 slasherId_) external override whenNotPaused onlyEOA {
     uint256 gasStart = gasleft();
     powerPoke.authorizeNonReporter(slasherId_, msg.sender);
 
