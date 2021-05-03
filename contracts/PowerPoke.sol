@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
-import "./interfaces/IPowerOracle.sol";
+import "./interfaces/IPowerOracleReader.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IEACAggregatorProxy.sol";
 import "./interfaces/IPowerPoke.sol";
@@ -134,7 +134,7 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
 
   function initialize(address owner_, address oracle_) external initializer {
     _transferOwnership(owner_);
-    oracle = IPowerOracle(oracle_);
+    oracle = oracle_;
   }
 
   /*** CLIENT'S CONTRACT INTERFACE ***/
@@ -196,8 +196,8 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
       return;
     }
 
-    helper.ethPrice = oracle.getPriceByAsset(WETH_TOKEN);
-    helper.cvpPrice = oracle.getPriceByAsset(address(CVP_TOKEN));
+    helper.ethPrice = IPowerOracleReader(oracle).getPriceByAsset(WETH_TOKEN);
+    helper.cvpPrice = IPowerOracleReader(oracle).getPriceByAsset(address(CVP_TOKEN));
 
     helper.gasPrice = getGasPriceFor(msg.sender);
     helper.compensationCVP = helper.gasPrice.mul(gasUsed_).mul(helper.ethPrice) / helper.cvpPrice;
@@ -375,7 +375,7 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
   }
 
   function setOracle(address oracle_) external override onlyOwner {
-    oracle = IPowerOracle(oracle_);
+    oracle = oracle_;
     emit SetOracle(oracle_);
   }
 

@@ -16,10 +16,25 @@ contract PowerOracleStorageV1 {
     uint256 acc;
   }
 
+  struct TokenConfig {
+    // Slot #1
+    uint96 baseUnit;
+    uint96 fixedPrice;
+    uint8 priceSource;
+    uint8 active;
+    // Slot #2
+    bytes32 symbolHash;
+  }
+
+  struct TokenConfigUpdate {
+    address uniswapMarket;
+    bool isUniswapReversed;
+  }
+
   /// @notice The linked PowerOracleStaking contract address
   IPowerPoke public powerPoke;
 
-  /// @notice Official prices and timestamps by symbol hash
+  /// @notice Official reported prices and timestamps by symbol hash
   mapping(bytes32 => Price) public prices;
 
   /// @notice Last slasher update time by a user ID
@@ -30,4 +45,15 @@ contract PowerOracleStorageV1 {
 
   /// @notice The new observation for each symbolHash
   mapping(bytes32 => Observation) public newObservations;
+
+  address[] public tokens;
+
+  mapping(string => address) public tokenBySymbol;
+  mapping(bytes32 => address) public tokenBySymbolHash;
+
+  // token => TokenConfig, push-only
+  mapping(address => TokenConfig) internal tokenConfigs;
+
+  // token => TokenUpdateConfig, push-only
+  mapping(address => TokenConfigUpdate) internal tokenUpdateConfigs;
 }

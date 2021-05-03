@@ -105,11 +105,12 @@ describe('PowerOracle', function () {
     );
     oracle = await deployProxied(
       StubOracle,
-      [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+      [cvpToken.address, ANCHOR_PERIOD],
       [owner, poke.address],
       { proxyAdminOwner: owner }
     );
 
+    await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
     await poke.setOracle(oracle.address, { from: owner });
     await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
     await cvpToken.transfer(alice, ether(10000000), { from: deployer });
@@ -120,7 +121,7 @@ describe('PowerOracle', function () {
     it('should assign constructor and initializer args correctly', async function() {
       expect(await oracle.owner()).to.be.equal(owner);
       expect(await oracle.powerPoke()).to.be.equal(poke.address);
-      expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
+      expect(await oracle.ANCHOR_PERIOD()).to.be.equal(ANCHOR_PERIOD);
       expect(await oracle.CVP_TOKEN()).to.be.equal(cvpToken.address);
     });
 
@@ -201,10 +202,11 @@ describe('PowerOracle', function () {
       beforeEach(async function() {
         oracle = await deployProxied(
           MockOracle,
-          [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+          [cvpToken.address, ANCHOR_PERIOD],
           [owner, poke.address],
           { proxyAdminOwner: owner }
         );
+        await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
         await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
         await poke.setOracle(oracle.address, { from: owner });
 
@@ -357,11 +359,12 @@ describe('PowerOracle', function () {
     beforeEach(async () => {
       oracle = await deployProxied(
         MockOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+        [cvpToken.address, ANCHOR_PERIOD],
         [owner, poke.address],
         { proxyAdminOwner: owner }
       );
 
+      await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
       await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
       await poke.setOracle(oracle.address, { from: owner });
 
@@ -685,9 +688,6 @@ describe('PowerOracle', function () {
     // Token configs are stored with static addresses, with no relation to the cvpToken in this file
     const CFG_USDT_ADDRESS = address(444);
     const CFG_ETH_ADDRESS = address(111);
-    const CFG_CVP_CTOKEN_ADDRESS = address(7);
-    const CFG_USDT_CTOKEN_ADDRESS = address(4);
-    const CFG_ETH_CTOKEN_ADDRESS = address(1);
 
     it('should respond with a correct values for a reported price', async function() {
       await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
@@ -695,7 +695,6 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(cvpToken.address)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
-      expect(await oracle.getUnderlyingPrice(CFG_CVP_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
       expect(await oracle.assetPrices(cvpToken.address)).to.be.equal(ether('1.4'));
     });
 
@@ -705,7 +704,6 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
-      expect(await oracle.getUnderlyingPrice(CFG_USDT_CTOKEN_ADDRESS)).to.be.equal(tether('1'));
       expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(tether('1'));
     });
 
@@ -715,7 +713,6 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
-      expect(await oracle.getUnderlyingPrice(CFG_ETH_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
     });
   })
 });

@@ -29,7 +29,7 @@ contract PowerPokeStorageV1 {
     uint64 perGas;
   }
 
-  IPowerOracle public oracle;
+  address public oracle;
 
   uint256 public totalCredits;
 
