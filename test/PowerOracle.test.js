@@ -882,7 +882,7 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset18(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
       expect(await oracle.getPriceBySymbolHash18(USDT_SYMBOL_HASH)).to.be.equal(ether('1'));
       expect(await oracle.getPriceBySymbol18('USDT')).to.be.equal(ether('1'));
-      expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(tether('1'));
+      expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
     });
   })
 });
