@@ -1,5 +1,5 @@
 const { time, expectEvent } = require('@openzeppelin/test-helpers');
-const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
+const { address, kether, ether, mwei, gwei, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
 const { getTokenConfigs, getAnotherTokenConfigs } = require('./localHelpers');
 
 const chai = require('chai');
@@ -883,6 +883,17 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceBySymbolHash18(USDT_SYMBOL_HASH)).to.be.equal(ether('1'));
       expect(await oracle.getPriceBySymbol18('USDT')).to.be.equal(ether('1'));
       expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
+    });
+
+    it('should respond with a correct values for getAssetPrices()', async function() {
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.8'));
+
+      const res = await oracle.getAssetPrices([cvpToken.address, CFG_USDT_ADDRESS]);
+      console.log(res);
+
+      expect(res[0]).to.be.equal(mwei('1.4'));
+      expect(res[1]).to.be.equal(mwei('1'));
     });
   })
 });
