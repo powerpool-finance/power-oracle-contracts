@@ -45,12 +45,12 @@ abstract contract UniswapTWAPProvider is PowerOracleReader {
    */
   function fetchEthPrice() internal returns (uint) {
     address token = tokenBySymbolHash[ethHash];
-    return fetchAnchorPrice("ETH", getTokenConfig(token), getTokenUpdateConfig(token), ethBaseUnit);
+    return fetchAnchorPrice("ETH", getActiveTokenConfig(token), getTokenUpdateConfig(token), ethBaseUnit);
   }
 
   function fetchCvpPrice(uint256 ethPrice) internal returns (uint) {
     address token = tokenBySymbolHash[cvpHash];
-    return fetchAnchorPrice("CVP", getTokenConfig(token), getTokenUpdateConfig(token), ethPrice);
+    return fetchAnchorPrice("CVP", getActiveTokenConfig(token), getTokenUpdateConfig(token), ethPrice);
   }
 
   /**

@@ -6,10 +6,28 @@ const PriceSource = {
   REPORTER: 1
 };
 
-const underlyings = {ETH: address(111), DAI: address(222), REP: address(333), USDT: address(444), SAI: address(555), WBTC: address(666), CVP: address(777)};
+const underlyings = {
+  ETH: address(111),
+  DAI: address(222),
+  REP: address(333),
+  USDT: address(444),
+  SAI: address(555),
+  WBTC: address(666),
+  CVP: address(777),
+  MKR: address(888),
+  UNI: address(999),
+};
+
+let mockPair;
+async function getPairMock() {
+  if (!mockPair) {
+    mockPair = await buildPair();
+  }
+  return mockPair;
+}
 
 async function getTokenConfigs(cvpAddress) {
-  const mockPair = await buildPair();
+  const mockPair = await getPairMock();
 
   return [
     {token: underlyings.ETH, symbol: 'ETH', basic: {symbolHash: keccak256('ETH'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, active: 2}, update: {uniswapMarket: mockPair.address, isUniswapReversed: true}},
@@ -21,4 +39,12 @@ async function getTokenConfigs(cvpAddress) {
   ];
 }
 
-module.exports = { getTokenConfigs }
+async function getAnotherTokenConfigs() {
+  const mockPair = await getPairMock();
+  return [
+    {token: underlyings.MKR, symbol: 'MKR', basic: {symbolHash: keccak256('MKR'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, active: 2}, update: {uniswapMarket: mockPair.address, isUniswapReversed: true}},
+    {token: underlyings.UNI, symbol: 'UNI', basic: {symbolHash: keccak256('UNI'), baseUnit: ether(1), priceSource: PriceSource.REPORTER, fixedPrice: 0, active: 2}, update: {uniswapMarket: mockPair.address, isUniswapReversed: true}},
+  ];
+}
+
+module.exports = { getTokenConfigs, getAnotherTokenConfigs }

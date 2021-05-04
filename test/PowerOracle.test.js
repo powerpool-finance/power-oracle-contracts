@@ -1,6 +1,6 @@
 const { time, expectEvent } = require('@openzeppelin/test-helpers');
 const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
-const { getTokenConfigs } = require('./localHelpers');
+const { getTokenConfigs, getAnotherTokenConfigs } = require('./localHelpers');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
@@ -173,11 +173,6 @@ describe('PowerOracle', function () {
     it('should deny calling with an empty array', async function() {
       await expect(oracle.pokeFromReporter(1, [], powerPokeOpts, { from: validReporterPoker }))
         .to.be.revertedWith('MISSING_SYMBOLS');
-    });
-
-    it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromReporter(1, ['FOO'], powerPokeOpts, { from: validReporterPoker }))
-        .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
     it('should deny poking with unknown token symbols', async function() {
@@ -682,6 +677,184 @@ describe('PowerOracle', function () {
           .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
+
+    describe('addTokens', async function() {
+      let newTokens;
+
+      beforeEach(async function() {
+        newTokens = await getAnotherTokenConfigs();
+      });
+
+      it('should allow the owner adding a new tokens', async function() {
+        const token = newTokens[0];
+        let res = await oracle.addTokens([token], { from: owner });
+        expectEvent(res, 'AddToken', {
+          token: token.token,
+          symbolHash: token.basic.symbolHash,
+          symbol: 'MKR',
+          baseUnit: token.basic.baseUnit,
+          fixedPrice: '0',
+          priceSource: '1',
+          uniswapMarket: token.update.uniswapMarket,
+          isUniswapReversed: token.update.isUniswapReversed,
+        });
+        expect(await oracle.tokenBySymbol(token.symbol)).to.be.equal(token.token);
+        expect(await oracle.tokenBySymbolHash(token.basic.symbolHash)).to.be.equal(token.token);
+        res = await oracle.getTokenConfig(token.token);
+        expect(res.baseUnit).to.be.equal(token.basic.baseUnit);
+        expect(res.fixedPrice).to.be.equal(token.basic.fixedPrice.toString());
+        expect(res.priceSource).to.be.equal(token.basic.priceSource.toString());
+
+        res = await oracle.getTokenUpdateConfig(token.token);
+        expect(res.uniswapMarket).to.be.equal(token.update.uniswapMarket);
+        expect(res.isUniswapReversed).to.be.equal(token.update.isUniswapReversed);
+      });
+
+      it('should deny the owner adding duplicating tokens', async function() {
+        await expect(oracle.addTokens([newTokens[0], newTokens[0]], { from: owner }))
+          .to.be.revertedWith('ALREADY_EXISTS');
+      });
+
+      it('should deny the owner adding an already existing token', async function() {
+        await oracle.addTokens([newTokens[0]], { from: owner });
+        await expect(oracle.addTokens([newTokens[0]], { from: owner }))
+          .to.be.revertedWith('ALREADY_EXISTS');
+      });
+
+      it('should deny adding a token with non-matching symbol and the symbols hash', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.symbol = 'BUZZ';
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('INVALID_SYMBOL_HASH');
+      });
+
+      it('should deny adding a token with 0 base unit value', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.basic.baseUnit = 0;
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('BASE_UNIT_IS_NULL');
+      });
+
+      it('should deny adding a token with an already existing symbol', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.symbol = 'DAI';
+        tokenConfig.basic.symbolHash = keccak256('DAI');
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('TOKEN_SYMBOL_ALREADY_MAPPED');
+      });
+
+      it('should deny non-owner adding new tokens', async function() {
+        await expect(oracle.addTokens(newTokens, { from: bob }))
+          .to.be.revertedWith('NOT_THE_OWNER');
+      });
+    });
+
+    describe('updateTokenMarket', async function() {
+      it('should allow the owner updating update details', async function() {
+        let res = await oracle.updateTokenMarket([{
+          token: address(111),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner });
+        expectEvent(res, 'UpdateTokenMarket', {
+          token: address(111),
+          uniswapMarket: address(30),
+          isUniswapReversed: true
+        })
+        res = await oracle.getTokenUpdateConfig(address(111));
+        expect(res.uniswapMarket).to.be.equal(address(30));
+        expect(res.isUniswapReversed).to.be.equal(true);
+      })
+
+      it('should allow the owner updating disabled token update details', async function() {
+        await oracle.setTokenActivities([{token: address(111), active: '1'}], { from: owner });
+        await oracle.updateTokenMarket([{
+          token: address(111),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner });
+        const res = await oracle.getTokenUpdateConfig(address(111));
+        expect(res.uniswapMarket).to.be.equal(address(30));
+        expect(res.isUniswapReversed).to.be.equal(true);
+      })
+
+      it('should deny updating non-existent token details', async function() {
+        await expect(oracle.updateTokenMarket([{
+          token: address(123),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner })).to.be.revertedWith('INVALID_ACTIVITY_STATUS');
+      });
+
+      it('should deny non-owner updating token details', async function() {
+        await expect(oracle.updateTokenMarket([{
+          token: address(123),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: alice })).to.be.revertedWith('NOT_THE_OWNER');
+      });
+    });
+
+    describe('setTokenActivities', async function() {
+      it('should allow the owner updating token activities from status 2', async function() {
+        let res = await oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: owner });
+        expectEvent(res, 'SetTokenActivity', {
+          token: address(111),
+          active: '1'
+        })
+        res = await oracle.getTokenConfig(address(111));
+        expect(res.active).to.be.equal('1');
+      })
+
+      it('should allow the owner updating token activities from status 1', async function() {
+        let res = await oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: owner });
+        await oracle.setTokenActivities([{
+          token: address(111),
+          active: 2
+        }], { from: owner });
+        res = await oracle.getTokenConfig(address(111));
+        expect(res.active).to.be.equal('2');
+      })
+
+      it('should deny updating to invalid activity status', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 3
+        }], { from: owner })).to.be.revertedWith('INVALID_NEW_ACTIVITY_STATUS');
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 0
+        }], { from: owner })).to.be.revertedWith('INVALID_NEW_ACTIVITY_STATUS');
+      })
+
+      it('should deny updating non-existent token', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(123),
+          active: 1
+        }], { from: owner })).to.be.revertedWith('INVALID_CURRENT_ACTIVITY_STATUS');
+      })
+
+      it('should deny non-owner updating token activity', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: alice })).to.be.revertedWith('NOT_THE_OWNER');
+      })
+    });
   });
 
   describe('viewers', () => {

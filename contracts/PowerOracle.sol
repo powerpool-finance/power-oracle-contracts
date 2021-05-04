@@ -105,10 +105,10 @@ contract PowerOracle is
     uint256 maxReportInterval_
   ) internal returns (ReportInterval) {
     address token = tokenBySymbol[symbol_];
-    TokenConfig memory basicConfig = getTokenConfig(token);
+    TokenConfig memory basicConfig = getActiveTokenConfig(token);
     TokenConfigUpdate memory updateConfig = getTokenUpdateConfig(token);
 
-    require(basicConfig.priceSource == PRICE_SOURCE_REPORTER, "NOT_REPORTER");
+    require(basicConfig.priceSource == PRICE_SOURCE_REPORTER, "NOT_REPORTED_PRICE_SOURCE");
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
 
     ReportInterval intervalStatus = getIntervalStatusForIntervals(symbolHash, minReportInterval_, maxReportInterval_);

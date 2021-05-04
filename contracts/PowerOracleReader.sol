@@ -31,7 +31,7 @@ contract PowerOracleReader is IPowerOracleReader, PowerOracleTokenManagement {
    * @return Price denominated in USD, with 6 decimals, for the given asset address
    */
   function getPriceByAsset(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfig(token_);
+    TokenConfig memory config = getActiveTokenConfig(token_);
     return priceInternal(config);
   }
 
@@ -63,7 +63,7 @@ contract PowerOracleReader is IPowerOracleReader, PowerOracleTokenManagement {
    * @return Price denominated in USD, with 18 decimals, for the given underlying address
    */
   function assetPrices(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfig(token_);
+    TokenConfig memory config = getActiveTokenConfig(token_);
     // Return price in the same format as getUnderlyingPrice, but by token address
     return priceInternal(config).mul(1e30) / config.baseUnit;
   }
