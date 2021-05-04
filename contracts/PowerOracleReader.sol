@@ -57,6 +57,37 @@ contract PowerOracleReader is IPowerOracleReader, PowerOracleTokenManagement {
   }
 
   /**
+   * @notice Get the underlying price of a token
+   * @param token_ The token address for price retrieval
+   * @return Price denominated in USD, with 18 decimals, for the given asset address
+   */
+  function getPriceByAsset18(address token_) external view override returns (uint256) {
+    TokenConfig memory config = getActiveTokenConfig(token_);
+    return priceInternal(config).mul(1e12);
+  }
+
+  /**
+   * @notice Get the official price for a symbol, like "COMP"
+   * @param symbol_ The symbol for price retrieval
+   * @return Price denominated in USD, with 18 decimals
+   */
+  function getPriceBySymbol18(string calldata symbol_) external view override returns (uint256) {
+    TokenConfig memory config = getTokenConfigBySymbol(symbol_);
+    return priceInternal(config).mul(1e12);
+  }
+
+  /**
+   * @notice Get price by a token symbol hash,
+   *    like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
+   * @param symbolHash_ The symbol hash for price retrieval
+   * @return Price denominated in USD, with 18 decimals, for the given asset address
+   */
+  function getPriceBySymbolHash18(bytes32 symbolHash_) external view override returns (uint256) {
+    TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash_);
+    return priceInternal(config).mul(1e12);
+  }
+
+  /**
    * @notice Get the price by underlying address
    * @dev Implements the old PriceOracle interface for Compound v2.
    * @param token_ The underlying address for price retrieval
@@ -65,6 +96,6 @@ contract PowerOracleReader is IPowerOracleReader, PowerOracleTokenManagement {
   function assetPrices(address token_) external view override returns (uint256) {
     TokenConfig memory config = getActiveTokenConfig(token_);
     // Return price in the same format as getUnderlyingPrice, but by token address
-    return priceInternal(config).mul(1e30) / config.baseUnit;
+    return priceInternal(config).mul(1e12);
   }
 }

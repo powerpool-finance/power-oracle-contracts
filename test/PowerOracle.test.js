@@ -860,7 +860,6 @@ describe('PowerOracle', function () {
   describe('viewers', () => {
     // Token configs are stored with static addresses, with no relation to the cvpToken in this file
     const CFG_USDT_ADDRESS = address(444);
-    const CFG_ETH_ADDRESS = address(111);
 
     it('should respond with a correct values for a reported price', async function() {
       await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
@@ -868,6 +867,9 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(cvpToken.address)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
+      expect(await oracle.getPriceByAsset18(cvpToken.address)).to.be.equal(ether('1.4'));
+      expect(await oracle.getPriceBySymbolHash18(CVP_SYMBOL_HASH)).to.be.equal(ether('1.4'));
+      expect(await oracle.getPriceBySymbol18('CVP')).to.be.equal(ether('1.4'));
       expect(await oracle.assetPrices(cvpToken.address)).to.be.equal(ether('1.4'));
     });
 
@@ -877,15 +879,10 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
+      expect(await oracle.getPriceByAsset18(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
+      expect(await oracle.getPriceBySymbolHash18(USDT_SYMBOL_HASH)).to.be.equal(ether('1'));
+      expect(await oracle.getPriceBySymbol18('USDT')).to.be.equal(ether('1'));
       expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(tether('1'));
-    });
-
-    it('should respond with a correct values for FIXED_ETH price', async function() {
-      await oracle.stubSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
-
-      expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
-      expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
-      expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
     });
   })
 });
