@@ -12,6 +12,8 @@ interface IPowerOracleV3Reader {
 
   function getAssetPrices(address[] calldata token) external view returns (uint256[] memory);
 
+  function getAssetPrices18(address[] calldata token) external view returns (uint256[] memory);
+
   function getPriceByAsset18(address token) external view returns (uint256);
 
   function getPriceBySymbol18(string calldata symbol) external view returns (uint256);

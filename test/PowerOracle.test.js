@@ -624,6 +624,7 @@ describe('PowerOracle', function () {
     });
 
     it('should deny poking with unknown token symbols', async function() {
+      await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
       await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
@@ -890,10 +891,19 @@ describe('PowerOracle', function () {
       await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.8'));
 
       const res = await oracle.getAssetPrices([cvpToken.address, CFG_USDT_ADDRESS]);
-      console.log(res);
 
       expect(res[0]).to.be.equal(mwei('1.4'));
       expect(res[1]).to.be.equal(mwei('1'));
+    });
+
+    it('should respond with a correct values for getAssetPrices18()', async function() {
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.8'));
+
+      const res = await oracle.getAssetPrices18([cvpToken.address, CFG_USDT_ADDRESS]);
+
+      expect(res[0]).to.be.equal(ether('1.4'));
+      expect(res[1]).to.be.equal(ether('1'));
     });
   })
 });

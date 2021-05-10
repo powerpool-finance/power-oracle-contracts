@@ -74,6 +74,23 @@ contract PowerOracleReader is IPowerOracleV3Reader, PowerOracleTokenManagement {
   }
 
   /**
+   * @notice Get the underlying price of multiple tokens
+   * @param tokens_ The token addresses for price retrieval
+   * @return Price denominated in USD, with 18 decimals, for a given asset address
+   */
+  function getAssetPrices18(address[] calldata tokens_) external view override returns (uint256[] memory) {
+    uint256 len = tokens_.length;
+    uint256[] memory result = new uint256[](len);
+
+    for (uint256 i = 0; i < len; i++) {
+      TokenConfig memory config = getActiveTokenConfig(tokens_[i]);
+      result[i] = priceInternal(config).mul(1e12);
+    }
+
+    return result;
+  }
+
+  /**
    * @notice Get the underlying price of a token
    * @param token_ The token address for price retrieval
    * @return Price denominated in USD, with 18 decimals, for the given asset address
