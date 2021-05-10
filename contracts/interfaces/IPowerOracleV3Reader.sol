@@ -3,7 +3,7 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
-interface IPowerOracleReader {
+interface IPowerOracleV3Reader {
   function getPriceByAsset(address token) external view returns (uint256);
 
   function getPriceBySymbol(string calldata symbol) external view returns (uint256);

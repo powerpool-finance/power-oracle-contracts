@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
-import "./interfaces/IPowerOracleReader.sol";
+import "./interfaces/IPowerOracleV3Reader.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IEACAggregatorProxy.sol";
 import "./interfaces/IPowerPoke.sol";
@@ -196,8 +196,8 @@ contract PowerPoke is IPowerPoke, PowerOwnable, Initializable, PowerPausable, Re
       return;
     }
 
-    helper.ethPrice = IPowerOracleReader(oracle).getPriceByAsset(WETH_TOKEN);
-    helper.cvpPrice = IPowerOracleReader(oracle).getPriceByAsset(address(CVP_TOKEN));
+    helper.ethPrice = IPowerOracleV3Reader(oracle).getPriceByAsset(WETH_TOKEN);
+    helper.cvpPrice = IPowerOracleV3Reader(oracle).getPriceByAsset(address(CVP_TOKEN));
 
     helper.gasPrice = getGasPriceFor(msg.sender);
     helper.compensationCVP = helper.gasPrice.mul(gasUsed_).mul(helper.ethPrice) / helper.cvpPrice;

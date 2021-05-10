@@ -3,11 +3,11 @@
 pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./interfaces/IPowerOracleReader.sol";
+import "./interfaces/IPowerOracleV3Reader.sol";
 import "./PowerOracleTokenManagement.sol";
 pragma experimental ABIEncoderV2;
 
-contract PowerOracleReader is IPowerOracleReader, PowerOracleTokenManagement {
+contract PowerOracleReader is IPowerOracleV3Reader, PowerOracleTokenManagement {
   using SafeMath for uint256;
 
   /// @notice The number of wei in 1 ETH

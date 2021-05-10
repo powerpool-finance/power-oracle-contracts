@@ -7,7 +7,7 @@ import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/SafeCast.sol";
-import "./interfaces/IPowerOracle.sol";
+import "./interfaces/IPowerOracleV3.sol";
 import "./interfaces/IPowerPoke.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/PowerPausable.sol";
@@ -25,6 +25,8 @@ contract PowerOracle is
 {
   using SafeMath for uint256;
   using SafeCast for uint256;
+
+  uint256 public constant POWER_ORACLE_VERSION = 3;
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
@@ -269,6 +271,8 @@ contract PowerOracle is
 
   function getIntervalStatus(bytes32 _symbolHash) public view returns (ReportInterval) {
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
+
+    require(minReportInterval > 0 && maxReportInterval > 0, "0_INTERVAL");
 
     return getIntervalStatusForIntervals(_symbolHash, minReportInterval, maxReportInterval);
   }

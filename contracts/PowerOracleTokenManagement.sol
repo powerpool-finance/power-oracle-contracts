@@ -3,10 +3,11 @@
 pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
 
+import "./interfaces/IPowerOracleV3TokenManagement.sol";
 import "./PowerOracleStorageV1.sol";
 import "./utils/PowerOwnable.sol";
 
-abstract contract PowerOracleTokenManagement is PowerOwnable, PowerOracleStorageV1 {
+abstract contract PowerOracleTokenManagement is IPowerOracleV3TokenManagement, PowerOwnable, PowerOracleStorageV1 {
   uint8 internal constant TOKEN_ACTIVITY_NOT_EXISTS = 0;
   uint8 internal constant TOKEN_ACTIVITY_DEPRECATED = 1;
   uint8 internal constant TOKEN_ACTIVITY_ACTIVE = 2;
@@ -32,11 +33,13 @@ abstract contract PowerOracleTokenManagement is PowerOwnable, PowerOracleStorage
     TokenConfigUpdate update;
   }
 
+  /// @notice Required only for the setup function, not persisted in the storage
   struct TokenConfigUpdateSetup {
     address token;
     TokenConfigUpdate update;
   }
 
+  /// @notice Required only for the setup function, not persisted in the storage
   struct TokenActivitySetup {
     address token;
     uint8 active;
@@ -126,7 +129,11 @@ abstract contract PowerOracleTokenManagement is PowerOwnable, PowerOracleStorage
     return getActiveTokenConfig(tokenBySymbol[symbol_]);
   }
 
-  function getTokens() external view returns (address[] memory) {
+  function getTokens() external view override returns (address[] memory) {
     return tokens;
+  }
+
+  function getTokenCount() external view override returns (uint256) {
+    return tokens.length;
   }
 }
