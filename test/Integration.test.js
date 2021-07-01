@@ -88,11 +88,12 @@ describe('IntegrationTest', function () {
 
     oracle = await deployProxied(
       PowerOracle,
-      [cvpToken.address, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+      [cvpToken.address, ANCHOR_PERIOD],
       [owner, poke.address],
       { proxyAdminOwner: owner }
       );
 
+    await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
     await poke.setOracle(oracle.address, { from: owner });
     await staking.setSlasher(poke.address, { from: owner });
 

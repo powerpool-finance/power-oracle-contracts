@@ -1,6 +1,6 @@
 const { time, expectEvent } = require('@openzeppelin/test-helpers');
-const { address, kether, ether, mwei, gwei, tether, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
-const { getTokenConfigs } = require('./localHelpers');
+const { address, kether, ether, mwei, gwei, deployProxied, getResTimestamp, keccak256 } = require('./helpers');
+const { getTokenConfigs, getAnotherTokenConfigs } = require('./localHelpers');
 
 const chai = require('chai');
 const MockCVP = artifacts.require('MockCVP');
@@ -105,11 +105,12 @@ describe('PowerOracle', function () {
     );
     oracle = await deployProxied(
       StubOracle,
-      [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+      [cvpToken.address, ANCHOR_PERIOD],
       [owner, poke.address],
       { proxyAdminOwner: owner }
     );
 
+    await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
     await poke.setOracle(oracle.address, { from: owner });
     await cvpToken.transfer(reservoir, ether(100000), { from: deployer });
     await cvpToken.transfer(alice, ether(10000000), { from: deployer });
@@ -120,7 +121,7 @@ describe('PowerOracle', function () {
     it('should assign constructor and initializer args correctly', async function() {
       expect(await oracle.owner()).to.be.equal(owner);
       expect(await oracle.powerPoke()).to.be.equal(poke.address);
-      expect(await oracle.anchorPeriod()).to.be.equal(ANCHOR_PERIOD);
+      expect(await oracle.ANCHOR_PERIOD()).to.be.equal(ANCHOR_PERIOD);
       expect(await oracle.CVP_TOKEN()).to.be.equal(cvpToken.address);
     });
 
@@ -179,11 +180,6 @@ describe('PowerOracle', function () {
         .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
 
-    it('should deny poking with unknown token symbols', async function() {
-      await expect(oracle.pokeFromReporter(1, ['FOO'], powerPokeOpts, { from: validReporterPoker }))
-        .to.be.revertedWith('TOKEN_NOT_FOUND');
-    });
-
     it('should deny poking when the contract is paused', async function() {
       await oracle.pause({ from: owner });
       await expect(oracle.pokeFromReporter(1, ['REP'], powerPokeOpts, { from: validReporterPoker }))
@@ -201,10 +197,11 @@ describe('PowerOracle', function () {
       beforeEach(async function() {
         oracle = await deployProxied(
           MockOracle,
-          [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+          [cvpToken.address, ANCHOR_PERIOD],
           [owner, poke.address],
           { proxyAdminOwner: owner }
         );
+        await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
         await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
         await poke.setOracle(oracle.address, { from: owner });
 
@@ -357,11 +354,12 @@ describe('PowerOracle', function () {
     beforeEach(async () => {
       oracle = await deployProxied(
         MockOracle,
-        [cvpToken.address, reservoir, ANCHOR_PERIOD, await getTokenConfigs(cvpToken.address)],
+        [cvpToken.address, ANCHOR_PERIOD],
         [owner, poke.address],
         { proxyAdminOwner: owner }
       );
 
+      await oracle.addTokens(await getTokenConfigs(cvpToken.address), { from: owner });
       await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
       await poke.setOracle(oracle.address, { from: owner });
 
@@ -626,6 +624,7 @@ describe('PowerOracle', function () {
     });
 
     it('should deny poking with unknown token symbols', async function() {
+      await poke.addClient(oracle.address, oracleClientOwner, true, gwei(300), MIN_REPORT_INTERVAL, MAX_REPORT_INTERVAL, { from: owner });
       await expect(oracle.poke(['FOO'], { from: bob }))
         .to.be.revertedWith('TOKEN_NOT_FOUND');
     });
@@ -679,15 +678,189 @@ describe('PowerOracle', function () {
           .to.be.revertedWith('NOT_THE_OWNER');
       });
     })
+
+    describe('addTokens', async function() {
+      let newTokens;
+
+      beforeEach(async function() {
+        newTokens = await getAnotherTokenConfigs();
+      });
+
+      it('should allow the owner adding a new tokens', async function() {
+        const token = newTokens[0];
+        let res = await oracle.addTokens([token], { from: owner });
+        expectEvent(res, 'AddToken', {
+          token: token.token,
+          symbolHash: token.basic.symbolHash,
+          symbol: 'MKR',
+          baseUnit: token.basic.baseUnit,
+          fixedPrice: '0',
+          priceSource: '1',
+          uniswapMarket: token.update.uniswapMarket,
+          isUniswapReversed: token.update.isUniswapReversed,
+        });
+        expect(await oracle.tokenBySymbol(token.symbol)).to.be.equal(token.token);
+        expect(await oracle.tokenBySymbolHash(token.basic.symbolHash)).to.be.equal(token.token);
+        res = await oracle.getTokenConfig(token.token);
+        expect(res.baseUnit).to.be.equal(token.basic.baseUnit);
+        expect(res.fixedPrice).to.be.equal(token.basic.fixedPrice.toString());
+        expect(res.priceSource).to.be.equal(token.basic.priceSource.toString());
+
+        res = await oracle.getTokenUpdateConfig(token.token);
+        expect(res.uniswapMarket).to.be.equal(token.update.uniswapMarket);
+        expect(res.isUniswapReversed).to.be.equal(token.update.isUniswapReversed);
+      });
+
+      it('should deny the owner adding duplicating tokens', async function() {
+        await expect(oracle.addTokens([newTokens[0], newTokens[0]], { from: owner }))
+          .to.be.revertedWith('ALREADY_EXISTS');
+      });
+
+      it('should deny the owner adding an already existing token', async function() {
+        await oracle.addTokens([newTokens[0]], { from: owner });
+        await expect(oracle.addTokens([newTokens[0]], { from: owner }))
+          .to.be.revertedWith('ALREADY_EXISTS');
+      });
+
+      it('should deny adding a token with non-matching symbol and the symbols hash', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.symbol = 'BUZZ';
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('INVALID_SYMBOL_HASH');
+      });
+
+      it('should deny adding a token with 0 base unit value', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.basic.baseUnit = 0;
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('BASE_UNIT_IS_NULL');
+      });
+
+      it('should deny adding a token with an already existing symbol', async function() {
+        const tokenConfig = { ...newTokens[0] };
+        tokenConfig.symbol = 'DAI';
+        tokenConfig.basic.symbolHash = keccak256('DAI');
+        await expect(oracle.addTokens([tokenConfig], { from: owner }))
+          .to.be.revertedWith('TOKEN_SYMBOL_ALREADY_MAPPED');
+      });
+
+      it('should deny non-owner adding new tokens', async function() {
+        await expect(oracle.addTokens(newTokens, { from: bob }))
+          .to.be.revertedWith('NOT_THE_OWNER');
+      });
+    });
+
+    describe('updateTokenMarket', async function() {
+      it('should allow the owner updating update details', async function() {
+        let res = await oracle.updateTokenMarket([{
+          token: address(111),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner });
+        expectEvent(res, 'UpdateTokenMarket', {
+          token: address(111),
+          uniswapMarket: address(30),
+          isUniswapReversed: true
+        })
+        res = await oracle.getTokenUpdateConfig(address(111));
+        expect(res.uniswapMarket).to.be.equal(address(30));
+        expect(res.isUniswapReversed).to.be.equal(true);
+      })
+
+      it('should allow the owner updating disabled token update details', async function() {
+        await oracle.setTokenActivities([{token: address(111), active: '1'}], { from: owner });
+        await oracle.updateTokenMarket([{
+          token: address(111),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner });
+        const res = await oracle.getTokenUpdateConfig(address(111));
+        expect(res.uniswapMarket).to.be.equal(address(30));
+        expect(res.isUniswapReversed).to.be.equal(true);
+      })
+
+      it('should deny updating non-existent token details', async function() {
+        await expect(oracle.updateTokenMarket([{
+          token: address(123),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: owner })).to.be.revertedWith('INVALID_ACTIVITY_STATUS');
+      });
+
+      it('should deny non-owner updating token details', async function() {
+        await expect(oracle.updateTokenMarket([{
+          token: address(123),
+          update: {
+            uniswapMarket: address(30),
+            isUniswapReversed: true
+          }
+        }], { from: alice })).to.be.revertedWith('NOT_THE_OWNER');
+      });
+    });
+
+    describe('setTokenActivities', async function() {
+      it('should allow the owner updating token activities from status 2', async function() {
+        let res = await oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: owner });
+        expectEvent(res, 'SetTokenActivity', {
+          token: address(111),
+          active: '1'
+        })
+        res = await oracle.getTokenConfig(address(111));
+        expect(res.active).to.be.equal('1');
+      })
+
+      it('should allow the owner updating token activities from status 1', async function() {
+        let res = await oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: owner });
+        await oracle.setTokenActivities([{
+          token: address(111),
+          active: 2
+        }], { from: owner });
+        res = await oracle.getTokenConfig(address(111));
+        expect(res.active).to.be.equal('2');
+      })
+
+      it('should deny updating to invalid activity status', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 3
+        }], { from: owner })).to.be.revertedWith('INVALID_NEW_ACTIVITY_STATUS');
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 0
+        }], { from: owner })).to.be.revertedWith('INVALID_NEW_ACTIVITY_STATUS');
+      })
+
+      it('should deny updating non-existent token', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(123),
+          active: 1
+        }], { from: owner })).to.be.revertedWith('INVALID_CURRENT_ACTIVITY_STATUS');
+      })
+
+      it('should deny non-owner updating token activity', async function() {
+        await expect(oracle.setTokenActivities([{
+          token: address(111),
+          active: 1
+        }], { from: alice })).to.be.revertedWith('NOT_THE_OWNER');
+      })
+    });
   });
 
   describe('viewers', () => {
     // Token configs are stored with static addresses, with no relation to the cvpToken in this file
     const CFG_USDT_ADDRESS = address(444);
-    const CFG_ETH_ADDRESS = address(111);
-    const CFG_CVP_CTOKEN_ADDRESS = address(7);
-    const CFG_USDT_CTOKEN_ADDRESS = address(4);
-    const CFG_ETH_CTOKEN_ADDRESS = address(1);
 
     it('should respond with a correct values for a reported price', async function() {
       await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
@@ -695,7 +868,9 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(cvpToken.address)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbolHash(CVP_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
       expect(await oracle.getPriceBySymbol('CVP')).to.be.equal(mwei('1.4'));
-      expect(await oracle.getUnderlyingPrice(CFG_CVP_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+      expect(await oracle.getPriceByAsset18(cvpToken.address)).to.be.equal(ether('1.4'));
+      expect(await oracle.getPriceBySymbolHash18(CVP_SYMBOL_HASH)).to.be.equal(ether('1.4'));
+      expect(await oracle.getPriceBySymbol18('CVP')).to.be.equal(ether('1.4'));
       expect(await oracle.assetPrices(cvpToken.address)).to.be.equal(ether('1.4'));
     });
 
@@ -705,17 +880,30 @@ describe('PowerOracle', function () {
       expect(await oracle.getPriceByAsset(CFG_USDT_ADDRESS)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbolHash(USDT_SYMBOL_HASH)).to.be.equal(mwei('1'));
       expect(await oracle.getPriceBySymbol('USDT')).to.be.equal(mwei('1'));
-      expect(await oracle.getUnderlyingPrice(CFG_USDT_CTOKEN_ADDRESS)).to.be.equal(tether('1'));
-      expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(tether('1'));
+      expect(await oracle.getPriceByAsset18(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
+      expect(await oracle.getPriceBySymbolHash18(USDT_SYMBOL_HASH)).to.be.equal(ether('1'));
+      expect(await oracle.getPriceBySymbol18('USDT')).to.be.equal(ether('1'));
+      expect(await oracle.assetPrices(CFG_USDT_ADDRESS)).to.be.equal(ether('1'));
     });
 
-    it('should respond with a correct values for FIXED_ETH price', async function() {
-      await oracle.stubSetPrice(ETH_SYMBOL_HASH, mwei('1.4'));
+    it('should respond with a correct values for getAssetPrices()', async function() {
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.8'));
 
-      expect(await oracle.getPriceByAsset(CFG_ETH_ADDRESS)).to.be.equal(mwei('1.4'));
-      expect(await oracle.getPriceBySymbolHash(ETH_SYMBOL_HASH)).to.be.equal(mwei('1.4'));
-      expect(await oracle.getPriceBySymbol('ETH')).to.be.equal(mwei('1.4'));
-      expect(await oracle.getUnderlyingPrice(CFG_ETH_CTOKEN_ADDRESS)).to.be.equal(ether('1.4'));
+      const res = await oracle.getAssetPrices([cvpToken.address, CFG_USDT_ADDRESS]);
+
+      expect(res[0]).to.be.equal(mwei('1.4'));
+      expect(res[1]).to.be.equal(mwei('1'));
+    });
+
+    it('should respond with a correct values for getAssetPrices18()', async function() {
+      await oracle.stubSetPrice(CVP_SYMBOL_HASH, mwei('1.4'));
+      await oracle.stubSetPrice(USDT_SYMBOL_HASH, mwei('1.8'));
+
+      const res = await oracle.getAssetPrices18([cvpToken.address, CFG_USDT_ADDRESS]);
+
+      expect(res[0]).to.be.equal(ether('1.4'));
+      expect(res[1]).to.be.equal(ether('1'));
     });
   })
 });

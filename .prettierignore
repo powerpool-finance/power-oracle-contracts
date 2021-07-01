@@ -9,8 +9,8 @@ node_modules/
 typechain/
 contracts/lib/FixedPoint.sol
 contracts/UniswapTWAPProvider.sol
-contracts/Uniswap/UniswapConfig.sol
-contracts/Uniswap/UniswapLib.sol
+contracts/Uniswap/UniswapV2Library.sol
+contracts/Uniswap/UniswapV2OracleLibrary.sol
 contracts/utils/Ownable.sol
 contracts/utils/Pausable.sol
 

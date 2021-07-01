@@ -4,7 +4,7 @@ pragma solidity ^0.6.12;
 
 pragma experimental ABIEncoderV2;
 
-import "./interfaces/IPowerOracle.sol";
+import "./interfaces/IPowerOracleV3.sol";
 
 contract PowerPokeStorageV1 {
   struct Client {
@@ -29,7 +29,7 @@ contract PowerPokeStorageV1 {
     uint64 perGas;
   }
 
-  IPowerOracle public oracle;
+  address public oracle;
 
   uint256 public totalCredits;
 

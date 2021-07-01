@@ -28,15 +28,4 @@ interface IPowerOracle {
   function pause() external;
 
   function unpause() external;
-
-  /*** Viewers ***/
-  function getPriceByAsset(address token) external view returns (uint256);
-
-  function getPriceBySymbol(string calldata symbol) external view returns (uint256);
-
-  function getPriceBySymbolHash(bytes32 symbolHash) external view returns (uint256);
-
-  function getUnderlyingPrice(address cToken) external view returns (uint256);
-
-  function assetPrices(address token) external view returns (uint256);
 }

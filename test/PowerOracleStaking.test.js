@@ -521,7 +521,8 @@ describe('PowerPokeStaking', function () {
 
   describe('setReporter', () => {
     beforeEach(async function() {
-      const powerOracle = await MockOracle.new(cvpToken.address, constants.ZERO_ADDRESS, 1, await getTokenConfigs(cvpToken.address));
+      const powerOracle = await MockOracle.new(cvpToken.address, 1);
+      await powerOracle.addTokens(await getTokenConfigs(cvpToken.address));
       await staking.setSlasher(powerOracle.address, { from: owner });
     });
 

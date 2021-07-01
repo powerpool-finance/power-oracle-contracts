@@ -7,16 +7,26 @@ import "@openzeppelin/upgrades-core/contracts/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/SafeCast.sol";
-import "./interfaces/IPowerOracle.sol";
+import "./interfaces/IPowerOracleV3.sol";
 import "./interfaces/IPowerPoke.sol";
 import "./UniswapTWAPProvider.sol";
 import "./utils/PowerPausable.sol";
 import "./utils/PowerOwnable.sol";
 import "./PowerPoke.sol";
+import "./PowerOracleTokenManagement.sol";
 
-contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable, UniswapTWAPProvider {
+contract PowerOracle is
+  IPowerOracle,
+  PowerOwnable,
+  Initializable,
+  PowerPausable,
+  PowerOracleTokenManagement,
+  UniswapTWAPProvider
+{
   using SafeMath for uint256;
   using SafeCast for uint256;
+
+  uint256 public constant POWER_ORACLE_VERSION = 3;
 
   uint256 internal constant COMPENSATION_PLAN_1_ID = 1;
   uint256 internal constant COMPENSATION_PLAN_2_ID = 2;
@@ -59,11 +69,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     _;
   }
 
-  constructor(
-    address cvpToken_,
-    uint256 anchorPeriod_,
-    TokenConfig[] memory configs
-  ) public UniswapTWAPProvider(anchorPeriod_, configs) UniswapConfig(configs) {
+  constructor(address cvpToken_, uint256 anchorPeriod_) public UniswapTWAPProvider(anchorPeriod_) {
     CVP_TOKEN = IERC20(cvpToken_);
   }
 
@@ -100,8 +106,11 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     uint256 minReportInterval_,
     uint256 maxReportInterval_
   ) internal returns (ReportInterval) {
-    TokenConfig memory config = getTokenConfigBySymbol(symbol_);
-    require(config.priceSource == PriceSource.REPORTER, "NOT_REPORTER");
+    address token = tokenBySymbol[symbol_];
+    TokenConfig memory basicConfig = getActiveTokenConfig(token);
+    TokenConfigUpdate memory updateConfig = getTokenUpdateConfig(token);
+
+    require(basicConfig.priceSource == PRICE_SOURCE_REPORTER, "NOT_REPORTED_PRICE_SOURCE");
     bytes32 symbolHash = keccak256(abi.encodePacked(symbol_));
 
     ReportInterval intervalStatus = getIntervalStatusForIntervals(symbolHash, minReportInterval_, maxReportInterval_);
@@ -113,7 +122,7 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     if (symbolHash == ethHash) {
       price = ethPrice_;
     } else {
-      price = fetchAnchorPrice(symbol_, config, ethPrice_);
+      price = fetchAnchorPrice(symbol_, basicConfig, updateConfig, ethPrice_);
     }
 
     _savePrice(symbolHash, price);
@@ -123,17 +132,6 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
 
   function _savePrice(bytes32 _symbolHash, uint256 price_) internal {
     prices[_symbolHash] = Price(block.timestamp.toUint128(), price_.toUint128());
-  }
-
-  function priceInternal(TokenConfig memory config_) internal view returns (uint256) {
-    if (config_.priceSource == PriceSource.REPORTER) return prices[config_.symbolHash].value;
-    if (config_.priceSource == PriceSource.FIXED_USD) return config_.fixedPrice;
-    if (config_.priceSource == PriceSource.FIXED_ETH) {
-      uint256 usdPerEth = prices[ethHash].value;
-      require(usdPerEth > 0, "ETH_PRICE_NOT_SET");
-      return mul(usdPerEth, config_.fixedPrice) / ethBaseUnit;
-    }
-    revert("UNSUPPORTED_PRICE_CASE");
   }
 
   /*** Pokers ***/
@@ -274,6 +272,8 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
   function getIntervalStatus(bytes32 _symbolHash) public view returns (ReportInterval) {
     (uint256 minReportInterval, uint256 maxReportInterval) = _getMinMaxReportInterval();
 
+    require(minReportInterval > 0 && maxReportInterval > 0, "0_INTERVAL");
+
     return getIntervalStatusForIntervals(_symbolHash, minReportInterval, maxReportInterval);
   }
 
@@ -293,61 +293,5 @@ contract PowerOracle is IPowerOracle, PowerOwnable, Initializable, PowerPausable
     }
 
     return ReportInterval.GREATER_THAN_MAX;
-  }
-
-  /**
-   * @notice Get the underlying price of a token
-   * @param token_ The token address for price retrieval
-   * @return Price denominated in USD, with 6 decimals, for the given asset address
-   */
-  function getPriceByAsset(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token_);
-    return priceInternal(config);
-  }
-
-  /**
-   * @notice Get the official price for a symbol, like "COMP"
-   * @param symbol_ The symbol for price retrieval
-   * @return Price denominated in USD, with 6 decimals
-   */
-  function getPriceBySymbol(string calldata symbol_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigBySymbol(symbol_);
-    return priceInternal(config);
-  }
-
-  /**
-   * @notice Get price by a token symbol hash,
-   *    like "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" for USDC
-   * @param symbolHash_ The symbol hash for price retrieval
-   * @return Price denominated in USD, with 6 decimals, for the given asset address
-   */
-  function getPriceBySymbolHash(bytes32 symbolHash_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigBySymbolHash(symbolHash_);
-    return priceInternal(config);
-  }
-
-  /**
-   * @notice Get the underlying price of a cToken
-   * @dev Implements the PriceOracle interface for Compound v2.
-   * @param cToken_ The cToken address for price retrieval
-   * @return Price denominated in USD, with 18 decimals, for the given cToken address
-   */
-  function getUnderlyingPrice(address cToken_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByCToken(cToken_);
-    // Comptroller needs prices in the format: ${raw price} * 1e(36 - baseUnit)
-    // Since the prices in this view have 6 decimals, we must scale them by 1e(36 - 6 - baseUnit)
-    return mul(1e30, priceInternal(config)) / config.baseUnit;
-  }
-
-  /**
-   * @notice Get the price by underlying address
-   * @dev Implements the old PriceOracle interface for Compound v2.
-   * @param token_ The underlying address for price retrieval
-   * @return Price denominated in USD, with 18 decimals, for the given underlying address
-   */
-  function assetPrices(address token_) external view override returns (uint256) {
-    TokenConfig memory config = getTokenConfigByUnderlying(token_);
-    // Return price in the same format as getUnderlyingPrice, but by token address
-    return mul(1e30, priceInternal(config)) / config.baseUnit;
   }
 }

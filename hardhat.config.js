@@ -90,10 +90,9 @@ const config = {
     tests: './test',
   },
   solidity: {
-    /* https://buidler.dev/buidler-evm/#solidity-optimizer-support */
     settings: {
       optimizer: {
-        enabled: true,
+        enabled: !!process.env.ETHERSCAN_KEY || process.env.COMPILE_TARGET === 'release',
         runs: 200,
       }
     },
